@@ -62,9 +62,20 @@ No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, aut
 
 ```text
 backend/app/{models,fixtures,analysis,db,main,worker}.py
+backend/app/portfolio/{models,fixtures}.py
 frontend/index.html
-tests/test_analysis.py, tests/test_api.py
+tests/test_analysis.py, tests/test_api.py, tests/test_portfolio_models.py
 docs/PLAN_ARQUITECTURA.md, docs/DECISIONES_PENDIENTES.md
 ```
 
 Consultar `docs/PLAN_ARQUITECTURA.md` para evolución de etapa 1 y decisiones de producción.
+
+## I1.1 · Cartera multiactivo offline
+
+El módulo `app.portfolio` representa instrumentos, listings, cuentas y posiciones. Las observaciones de NAV, cierre, último precio, precio indicativo y FX tienen procedencia propia. El contrato interno usa fechas ISO para NAV y `Decimal` para cantidades, precios, tasas y coberturas. En JSON, las cantidades fraccionarias se transmiten como cadenas. La tasa FX expresa unidades de la moneda cotizada por cada unidad de moneda base.
+
+`app.portfolio.fixtures` contiene una cartera con identificadores de instrumentos reales y cantidades, precios, fechas y tasas inventados. `FixtureMarketDataProvider` devuelve observaciones simuladas por instrumento y listing exactos. E01 con plaza desconocida conserva `listing_id=None` y la búsqueda queda sin cotización. F04 ejemplifica un precio ausente, y una composición de peso desconocido se representa con `None`. La integración con la API y el cálculo de valoraciones corresponden a incrementos posteriores.
+
+```bash
+python -m pytest -q tests/test_portfolio_models.py
+```
