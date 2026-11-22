@@ -22,7 +22,7 @@ DEMO_PORTFOLIO = Portfolio.model_validate({
 
 DEMO_PROFILE = Profile.model_validate({
     "name": "Perfil demostrativo",
-    "horizon": "largo plazo (10 anos)",
+    "horizon": "largo plazo (10 años)",
     "risk_tolerance": "medium",
     "constraints": ["Sin operaciones automaticas"],
     "notes": "Ejemplo sintetico para pruebas, no es asesoramiento financiero"
