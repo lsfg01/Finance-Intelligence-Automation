@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Análisis de cartera — laboratorio</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#122032;background:#f6f8fa}
+    *{box-sizing:border-box} body{margin:0} header{background:#172d44;color:#fff;padding:22px max(22px,calc((100% - 1050px)/2))}
+    main{max-width:1050px;margin:24px auto;padding:0 20px} h1{margin:0;font-size:1.6rem} h2{font-size:1.12rem;margin:0 0 14px}
+    .sub{color:#ccd9e3;margin-top:6px} .alert{padding:13px 18px;border:1px solid #d9a637;background:#fff6df;border-radius:10px;margin-bottom:20px}
+    .cards{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}.card{background:white;border:1px solid #dbe3ea;border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 2px 6px #172d4408}
+    table{width:100%;border-collapse:collapse;font-size:.91rem} td,th{padding:9px 6px;border-bottom:1px solid #e5ebf0;text-align:left} th{color:#617084;font-weight:600}
+    .pill{display:inline-block;padding:4px 8px;border-radius:15px;background:#e6f0ff;color:#1457a1;font-weight:600;font-size:.78rem}
+    .muted{color:#667b8c}.small{font-size:.82rem} button{background:#215caa;color:white;padding:12px 16px;border:0;border-radius:9px;font-weight:650;cursor:pointer}
+    button:disabled{background:#879bad;cursor:default}.stat{font-size:1.6rem;font-weight:720;margin:7px 0} .pair{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    code{background:#eef2f6;padding:2px 4px;border-radius:3px;word-break:break-all} ul{padding-left:20px} li{margin:7px 0}
+    @media(max-width:750px){.cards{grid-template-columns:1fr}header{padding:22px}}
+  </style>
+</head>
+<body>
+<header><h1>Laboratorio de análisis de inversiones</h1><div class="sub">Primer incremento · Cartera versionada · Exposición trazable · Análisis bajo demanda</div></header>
+<main>
+  <div class="alert"><strong>SIMULACIÓN — Sin datos reales.</strong> Precios, instrumentos y noticias inventados exclusivamente para probar la ingeniería. No se trata de asesoramiento financiero.</div>
+  <div class="cards">
+    <section class="card"><h2>Cartera</h2><p id="versions" class="muted">Cargando...</p><div id="positions"></div></section>
+    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div><hr style="border:0;border-top:1px solid #e5ebf0;margin:20px 0"><h2>Ejecutar análisis</h2><p class="small muted">Solo se genera al pulsar el botón. Worker independiente.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
+  </div>
+  <section class="card"><div class="pair"><h2>Informe</h2><span id="report-version" class="pill" hidden></span></div><div id="report"><p class="muted">Aún no hay informe seleccionado. Ejecuta un análisis.</p></div></section>
+</main>
+<script>
+const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+async function api(url, options){const response=await fetch(url,options); if(!response.ok){throw new Error((await response.text()).slice(0,250))}return response.json();}
+async function refresh(){
+ const [portfolio,profile,reports] = await Promise.all([api('/api/portfolio'),api('/api/profile'),api('/api/reports')]);
+ document.getElementById('versions').textContent = `Versión ${portfolio.version} · Moneda ${portfolio.data.base_currency}`;
+ document.getElementById('positions').innerHTML='<table><thead><tr><th>Instrumento</th><th>Valor EUR</th><th>Fecha</th></tr></thead><tbody>'+portfolio.data.positions.map(p=>`<tr><td>${esc(p.name)}<div class="muted small">${esc(p.kind)} · ${esc(p.instrument_id)}</div></td><td>${fmt(Number(p.quantity)*Number(p.unit_price))}</td><td>${esc(p.price_at.slice(0,10))}<div class="muted small">${esc(p.price_source)}</div></td></tr>`).join('')+'</tbody></table>';
+ document.getElementById('profile').innerHTML=`<p><strong>${esc(profile.data.name)}</strong> · versión ${profile.version}</p><p>Horizonte: ${esc(profile.data.horizon)}</p><p>Riesgo: ${esc(profile.data.risk_tolerance)}</p><p class="muted small">${profile.data.constraints.map(esc).join(' · ')}</p>`;
+ if(reports.length){await showReport(reports[0].id)}
+}
+function esc(x){return String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function showReport(id){
+ const r=await api('/api/reports/'+encodeURIComponent(id));const d=r.result;
+ const b=document.getElementById('report-version');b.hidden=false;b.textContent=`Cartera v${r.portfolio_version} · Perfil v${r.profile_version} · ${d.data_classification}`;
+ document.getElementById('report').innerHTML=`<p><span class="pill">${esc(d.proposal)}</span> <strong>${esc(d.rationale)}</strong></p>
+ <h3>Exposición identificada</h3>${d.exposures.map(e=>`<p><strong>${esc(e.issuer_id)}</strong>: ${fmt(e.known_total_eur)} EUR (${esc(e.known_share_pct ?? '?')} % de la cartera)<br><span class="small muted">Directa: ${fmt(e.direct_eur)} · Indirecta: ${fmt(e.indirect_eur)}</span></p>
+ <ul>${e.matches.map(m=>`<li>${esc(m.kind)} · ${esc(m.position_id)} · ${fmt(m.value_eur)} EUR · ${esc(m.trace)}</li>`).join('')}</ul>
+ ${e.coverage_warnings.map(c=>`<p class="small muted">⚠️ ${esc(c.position_id)}: composición no observada ${esc(c.uncovered_weight_pct)} %</p>`).join('')}
+ <p class="small muted">${esc(e.coverage_note)}</p>`).join('')}
+ <h3>Evidencia</h3><ul>${d.evidence.map(ev=>`<li><strong>${esc(ev.document_id)}</strong>: ${esc(ev.title)}<div class="small muted">${esc(ev.source_name)} · ${esc(ev.source_kind)} · publicado ${esc(ev.published_at)}</div></li>`).join('')}</ul>
+ <h3>Limitaciones y argumentos</h3><ul>${[...d.arguments_against,...d.risks,...d.missing_data,...d.warnings].map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+ <p class="small muted">Informe congelado; los cambios posteriores de cartera/perfil no lo modificarán.</p>`;
+}
+const btn=document.getElementById('run');const status=document.getElementById('status');
+btn.addEventListener('click',async()=>{
+ btn.disabled=true; status.textContent='Creando trabajo...';
+ try{
+  const r=await api('/api/analyses',{method:'POST'});status.textContent=`Trabajo ${r.id.slice(0,8)}: en cola`;
+  for(let tries=0;tries<120;tries++){
+    await new Promise(resolve=>setTimeout(resolve,1000));const s=await api('/api/analyses/'+r.id);
+    status.textContent='Estado: '+s.status;
+    if(s.status==='completed'){await showReport(s.report_id);break;}
+    if(s.status==='failed'){throw new Error(s.error || 'Error desconocido');}
+    if(tries===119){status.textContent='El trabajo sigue pendiente. Comprueba que el worker esté arrancado.'}
+  }
+ } catch(e){status.textContent='Error: '+e.message} finally{btn.disabled=false}
+});
+refresh().catch(e=>status.textContent='Error al cargar: '+e.message);
+</script>
+</body>
+</html>
