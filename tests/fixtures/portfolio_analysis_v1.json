@@ -1,0 +1,224 @@
+{
+  "contract_version": "1",
+  "portfolio": {
+    "snapshot_id": "SIM-ANALYSIS-PORTFOLIO-V1",
+    "portfolio_id": "SIM-PORTFOLIO",
+    "version": 1,
+    "base_currency": "EUR",
+    "accounts": [
+      {
+        "account_id": "SIM-ACCOUNT",
+        "name": "Cuenta ficticia"
+      }
+    ],
+    "positions": [
+      {
+        "position_id": "SIM-F03",
+        "account_id": "SIM-ACCOUNT",
+        "instrument_id": "F03",
+        "listing_id": null,
+        "quantity": "9.125",
+        "as_of": "2024-01-15"
+      },
+      {
+        "position_id": "SIM-E01",
+        "account_id": "SIM-ACCOUNT",
+        "instrument_id": "E01",
+        "listing_id": "E01-XLON",
+        "quantity": "6",
+        "as_of": "2024-01-15"
+      },
+      {
+        "position_id": "SIM-F04",
+        "account_id": "SIM-ACCOUNT",
+        "instrument_id": "F04",
+        "listing_id": null,
+        "quantity": "2.25",
+        "as_of": "2024-01-15"
+      }
+    ],
+    "as_of": "2024-01-15",
+    "is_simulated": true
+  },
+  "valuation": {
+    "snapshot_id": "SIM-ANALYSIS-VALUATION-V1",
+    "portfolio_snapshot_id": "SIM-ANALYSIS-PORTFOLIO-V1",
+    "portfolio_id": "SIM-PORTFOLIO",
+    "portfolio_version": 1,
+    "portfolio_as_of": "2024-01-15",
+    "base_currency": "EUR",
+    "as_of": "2024-01-15",
+    "calculated_at": "2024-01-15T22:00:00Z",
+    "max_price_age_days": 0,
+    "listed_price_type": "EOD_CLOSE",
+    "positions": [
+      {
+        "position": {
+          "position_id": "SIM-F03",
+          "account_id": "SIM-ACCOUNT",
+          "instrument_id": "F03",
+          "listing_id": null,
+          "quantity": "9.125",
+          "as_of": "2024-01-15"
+        },
+        "quote_currency": "EUR",
+        "quote_value": "769.0093750",
+        "base_value": "769.0093750",
+        "price_observation_id": "SIM-QUOTE-F03",
+        "fx_observation_id": null,
+        "issue": null
+      },
+      {
+        "position": {
+          "position_id": "SIM-E01",
+          "account_id": "SIM-ACCOUNT",
+          "instrument_id": "E01",
+          "listing_id": "E01-XLON",
+          "quantity": "6",
+          "as_of": "2024-01-15"
+        },
+        "quote_currency": "USD",
+        "quote_value": "486.90",
+        "base_value": "432.8",
+        "price_observation_id": "SIM-QUOTE-E01-XLON",
+        "fx_observation_id": "SIM-FX01",
+        "issue": null
+      },
+      {
+        "position": {
+          "position_id": "SIM-F04",
+          "account_id": "SIM-ACCOUNT",
+          "instrument_id": "F04",
+          "listing_id": null,
+          "quantity": "2.25",
+          "as_of": "2024-01-15"
+        },
+        "quote_currency": null,
+        "quote_value": null,
+        "base_value": null,
+        "price_observation_id": null,
+        "fx_observation_id": null,
+        "issue": "MISSING_PRICE"
+      }
+    ],
+    "price_observations": [
+      {
+        "observation_id": "SIM-QUOTE-E01-XLON",
+        "provider": "fixture",
+        "source": "I1.1 offline fixture",
+        "license": "synthetic_fixture",
+        "retrieved_at": "2024-01-15T22:00:00Z",
+        "is_simulated": true,
+        "instrument_id": "E01",
+        "listing_id": "E01-XLON",
+        "value": "81.15",
+        "currency": "USD",
+        "price_type": "EOD_CLOSE",
+        "price_as_of": "2024-01-15"
+      },
+      {
+        "observation_id": "SIM-QUOTE-F03",
+        "provider": "fixture",
+        "source": "I1.1 offline fixture",
+        "license": "synthetic_fixture",
+        "retrieved_at": "2024-01-15T22:00:00Z",
+        "is_simulated": true,
+        "instrument_id": "F03",
+        "listing_id": null,
+        "value": "84.2750",
+        "currency": "EUR",
+        "price_type": "NAV",
+        "price_as_of": "2024-01-15"
+      }
+    ],
+    "fx_observations": [
+      {
+        "observation_id": "SIM-FX01",
+        "provider": "fixture",
+        "source": "I1.1 offline fixture",
+        "license": "synthetic_fixture",
+        "retrieved_at": "2024-01-15T22:00:00Z",
+        "is_simulated": true,
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "rate": "1.1250",
+        "as_of": "2024-01-15"
+      }
+    ],
+    "valued_positions": 2,
+    "total_positions": 3,
+    "known_value": "1201.8093750",
+    "total_value": null,
+    "status": "PARTIAL",
+    "is_simulated": true
+  },
+  "instruments": [
+    {
+      "instrument_id": "F03",
+      "name": "Vanguard Global Bond Index Fund EUR Hedged Acc",
+      "asset_type": "MUTUAL_FUND",
+      "issuer_id": null,
+      "isin": "IE00B18GC888",
+      "share_class_currency": "EUR",
+      "fund_base_currency": null
+    },
+    {
+      "instrument_id": "E01",
+      "name": "iShares Core MSCI World UCITS ETF USD Acc",
+      "asset_type": "ETF",
+      "issuer_id": null,
+      "isin": "IE00B4L5Y983",
+      "share_class_currency": "USD",
+      "fund_base_currency": "USD"
+    },
+    {
+      "instrument_id": "F04",
+      "name": "MyInvestor Cartera Permanente FI",
+      "asset_type": "MUTUAL_FUND",
+      "issuer_id": null,
+      "isin": "ES0156572002",
+      "share_class_currency": "EUR",
+      "fund_base_currency": null
+    }
+  ],
+  "listings": [
+    {
+      "listing_id": "E01-XETR",
+      "instrument_id": "E01",
+      "mic": "XETR",
+      "ticker": "EUNL",
+      "currency": "EUR"
+    },
+    {
+      "listing_id": "E01-XLON",
+      "instrument_id": "E01",
+      "mic": "XLON",
+      "ticker": "IWDA",
+      "currency": "USD"
+    }
+  ],
+  "compositions": [
+    {
+      "observation_id": "SIM-COMPOSITION-E01",
+      "provider": "fixture",
+      "source": "I1.1 offline fixture",
+      "license": "synthetic_fixture",
+      "retrieved_at": "2024-01-15T22:00:00Z",
+      "is_simulated": true,
+      "instrument_id": "E01",
+      "as_of": "2024-01-15",
+      "known_weight": "0.40"
+    },
+    {
+      "observation_id": "SIM-COMPOSITION-F03",
+      "provider": "fixture",
+      "source": "I1.1 offline fixture",
+      "license": "synthetic_fixture",
+      "retrieved_at": "2024-01-15T22:00:00Z",
+      "is_simulated": true,
+      "instrument_id": "F03",
+      "as_of": "2024-01-15",
+      "known_weight": null
+    }
+  ]
+}
