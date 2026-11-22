@@ -52,6 +52,8 @@ No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, aut
 |---|---|---|
 | `GET` | `/api/health` | Estado y modo de ejecución |
 | `GET`, `PUT` | `/api/portfolio` | Leer / crear versión de cartera |
+| `GET` | `/api/portfolio/valuation` | Leer la última valoración multiactivo guardada |
+| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración multiactivo simulada a demanda |
 | `GET`, `PUT` | `/api/profile` | Leer / crear versión de perfil |
 | `POST` | `/api/analyses` | Encolar nuevo análisis manual |
 | `GET` | `/api/analyses/{id}` | Estado, error, informe generado |
@@ -88,8 +90,20 @@ python -m pytest -q tests/test_portfolio_models.py
 - El motor usa `Decimal` con 38 cifras de precisión y redondeo al par. El redondeo a unidades monetarias menores corresponde a la presentación. Con EUR como base y una tasa de 1,10 USD por EUR, se dividen los USD entre 1,10. Se admite el par inverso mediante multiplicación. La tasa debe corresponder a la fecha del precio.
 - La antigüedad máxima del precio se configura en días naturales y por defecto exige la fecha de valoración. El motor descarta observaciones posteriores al corte UTC. La cobertura se mide por número de posiciones valoradas.
 - `COMPLETE` incluye el total. `PARTIAL` y `MISSING` conservan `total_value=None` y el valor conocido. El motivo por posición permite distinguir falta de precio, FX ausente, plaza ambigua y otros problemas.
-- `ValuationSnapshotStore` guarda y recupera los documentos en SQLite local. Guardar el mismo documento es idempotente. Un intento de reutilizar su ID con otro contenido falla. La API, el worker y el dashboard siguen usando el flujo previo.
+- `ValuationSnapshotStore` guarda y recupera los documentos en SQLite local. Guardar el mismo documento es idempotente. Un intento de reutilizar su ID con otro contenido falla.
 
 ```bash
 python -m pytest -q tests/test_portfolio_valuation.py
+```
+
+## I1.4 · Refresco de precios en el dashboard
+
+Abre el dashboard y pulsa **Actualizar precios** en la sección multiactivo. El botón usa una cartera de referencia con identificadores reales y tenencias, precios y FX simulados. El estado inicial se lee de SQLite, con `valuation: null` antes del primer refresco. Cada petición simulada devuelve HTTP 201 y crea un snapshot propio. La demo muestra diez de once posiciones valoradas. Se identifica el valor conocido y el total queda indeterminado.
+
+La cartera de referencia multiactivo tiene su propia versión de tenencias. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
+
+Una petición explícita con `?mode=live` devuelve HTTP 503 mientras esté pendiente la autorización de un proveedor de precios. El adaptador FX del BCE está disponible como módulo separado.
+
+```bash
+python -m pytest -q tests/test_portfolio_refresh.py
 ```

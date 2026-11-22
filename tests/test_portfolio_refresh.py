@@ -1,0 +1,71 @@
+from decimal import Decimal
+from uuid import UUID
+
+from fastapi.testclient import TestClient
+
+from app import db
+from app.main import create_app
+from app.portfolio.valuation_store import ValuationSnapshotStore
+
+
+def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_analysis(tmp_path):
+    path = tmp_path / "demo.sqlite3"
+    with TestClient(create_app(str(path))) as client:
+        page = client.get("/")
+        assert page.status_code == 200
+        assert 'id="refresh-prices">Actualizar precios' in page.text
+        assert 'id="run">Analizar cartera' in page.text
+        assert client.get("/api/portfolio/valuation").json()["valuation"] is None
+
+        response = client.post("/api/portfolio/refresh-prices")
+        assert response.status_code == 201
+        valuation = response.json()["valuation"]
+        assert UUID(valuation["snapshot_id"])
+        assert valuation["status"] == "PARTIAL"
+        assert valuation["total_value"] is None
+        assert valuation["valued_positions"] == 10
+        assert valuation["total_positions"] == 11
+        assert valuation["is_simulated"]
+        assert valuation["as_of"] == "2024-01-15"
+        assert Decimal(valuation["known_value"]) > 0
+        assert {item["retrieved_at"] for item in valuation["price_observations"]} == {"2024-01-15T22:00:00Z"}
+        missing = [row for row in valuation["positions"] if row["issue"] == "MISSING_PRICE"]
+        assert [row["position"]["instrument_id"] for row in missing] == ["F04"]
+        assert client.get("/api/portfolio/valuation").json() == response.json()
+        assert client.get("/api/reports").json() == []
+        assert db.process_one(str(path)) is None
+
+    with TestClient(create_app(str(path))) as restarted:
+        assert restarted.get("/api/portfolio/valuation").json()["valuation"] == valuation
+
+
+def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
+    path = tmp_path / "demo.sqlite3"
+    with TestClient(create_app(str(path))) as client:
+        run = client.post("/api/analyses").json()
+        assert db.process_one(str(path)) == run["id"]
+        report_id = client.get(f"/api/analyses/{run['id']}").json()["report_id"]
+        original_report = client.get(f"/api/reports/{report_id}").json()
+        original_portfolio = client.get("/api/portfolio").json()
+        first = client.post("/api/portfolio/refresh-prices").json()["valuation"]
+        second = client.post("/api/portfolio/refresh-prices").json()["valuation"]
+
+        assert first["snapshot_id"] != second["snapshot_id"]
+        assert first["portfolio_snapshot_id"] == second["portfolio_snapshot_id"]
+        assert first["positions"] == second["positions"]
+        assert client.get("/api/portfolio/valuation").json()["valuation"] == second
+        assert client.get("/api/portfolio").json() == original_portfolio
+        assert client.get(f"/api/reports/{report_id}").json() == original_report
+        assert db.process_one(str(path)) is None
+
+        stored = ValuationSnapshotStore(path).get(first["snapshot_id"])
+        assert stored is not None
+        assert stored.model_dump(mode="json") == first
+
+
+def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path):
+    with TestClient(create_app(str(tmp_path / "demo.sqlite3"))) as client:
+        response = client.post("/api/portfolio/refresh-prices?mode=live")
+        assert response.status_code == 503
+        assert response.json() == {"detail": "Sin proveedor autorizado de precios reales"}
+        assert client.get("/api/portfolio/valuation").json()["valuation"] is None

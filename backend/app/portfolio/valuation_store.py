@@ -44,3 +44,15 @@ class ValuationSnapshotStore:
                 (snapshot_id,),
             ).fetchone()
         return ValuationSnapshot.model_validate_json(row[0]) if row else None
+
+    def latest_for_portfolio(self, portfolio_id: str) -> ValuationSnapshot | None:
+        with closing(sqlite3.connect(self.path)) as connection:
+            row = connection.execute(
+                """
+                SELECT payload FROM valuation_snapshots
+                WHERE json_extract(payload, '$.portfolio_id') = ?
+                ORDER BY rowid DESC LIMIT 1
+                """,
+                (portfolio_id,),
+            ).fetchone()
+        return ValuationSnapshot.model_validate_json(row[0]) if row else None
