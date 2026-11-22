@@ -62,7 +62,7 @@ No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, aut
 
 ```text
 backend/app/{models,fixtures,analysis,db,main,worker}.py
-backend/app/portfolio/{models,fixtures}.py
+backend/app/portfolio/{models,fixtures,valuation,valuation_store}.py
 frontend/index.html
 tests/test_analysis.py, tests/test_api.py, tests/test_portfolio_models.py
 docs/PLAN_ARQUITECTURA.md, docs/DECISIONES_PENDIENTES.md
@@ -74,8 +74,22 @@ Consultar `docs/PLAN_ARQUITECTURA.md` para evolución de etapa 1 y decisiones de
 
 El módulo `app.portfolio` representa instrumentos, listings, cuentas y posiciones. Las observaciones de NAV, cierre, último precio, precio indicativo y FX tienen procedencia propia. El contrato interno usa fechas ISO para NAV y `Decimal` para cantidades, precios, tasas y coberturas. En JSON, las cantidades fraccionarias se transmiten como cadenas. La tasa FX expresa unidades de la moneda cotizada por cada unidad de moneda base.
 
-`app.portfolio.fixtures` contiene una cartera con identificadores de instrumentos reales y cantidades, precios, fechas y tasas inventados. `FixtureMarketDataProvider` devuelve observaciones simuladas por instrumento y listing exactos. E01 con plaza desconocida conserva `listing_id=None` y la búsqueda queda sin cotización. F04 ejemplifica un precio ausente, y una composición de peso desconocido se representa con `None`. La integración con la API y el cálculo de valoraciones corresponden a incrementos posteriores.
+`app.portfolio.fixtures` contiene una cartera con identificadores de instrumentos reales y cantidades, precios, fechas y tasas inventados. `FixtureMarketDataProvider` devuelve observaciones simuladas por instrumento y listing exactos. E01 con plaza desconocida conserva `listing_id=None` y la búsqueda queda sin cotización. F04 ejemplifica un precio ausente, y una composición de peso desconocido se representa con `None`.
 
 ```bash
 python -m pytest -q tests/test_portfolio_models.py
+```
+
+## I1.3 · Valoración determinista offline
+
+`value_portfolio()` recibe el snapshot de tenencias, el catálogo y las observaciones fijadas por el llamador. El resultado conserva la versión de cartera, las posiciones, los importes en divisa de cotización y divisa base, y las observaciones de precio y FX empleadas. Se identifica con el `snapshot_id` que proporciona el llamador.
+
+- Los fondos tradicionales usan NAV de su clase. Las acciones, ETF y ETC requieren un listing explícito y un cierre por defecto. Se puede seleccionar `LAST` al invocar el motor. El fixture de Bitcoin usa un precio indicativo. Los bonos individuales quedan sin valoración hasta disponer de un método para el nominal y el tipo de cotización.
+- El motor usa `Decimal` con 38 cifras de precisión y redondeo al par. El redondeo a unidades monetarias menores corresponde a la presentación. Con EUR como base y una tasa de 1,10 USD por EUR, se dividen los USD entre 1,10. Se admite el par inverso mediante multiplicación. La tasa debe corresponder a la fecha del precio.
+- La antigüedad máxima del precio se configura en días naturales y por defecto exige la fecha de valoración. El motor descarta observaciones posteriores al corte UTC. La cobertura se mide por número de posiciones valoradas.
+- `COMPLETE` incluye el total. `PARTIAL` y `MISSING` conservan `total_value=None` y el valor conocido. El motivo por posición permite distinguir falta de precio, FX ausente, plaza ambigua y otros problemas.
+- `ValuationSnapshotStore` guarda y recupera los documentos en SQLite local. Guardar el mismo documento es idempotente. Un intento de reutilizar su ID con otro contenido falla. La API, el worker y el dashboard siguen usando el flujo previo.
+
+```bash
+python -m pytest -q tests/test_portfolio_valuation.py
 ```
