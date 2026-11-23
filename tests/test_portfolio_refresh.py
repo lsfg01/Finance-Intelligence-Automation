@@ -1,25 +1,40 @@
 from decimal import Decimal
+import sqlite3
 from uuid import UUID
 
 from fastapi.testclient import TestClient
 
 from app import db
 from app.main import create_app
+from app.models import Portfolio
+from app.portfolio.fixtures import DEMO_PORTFOLIO
 from app.portfolio.valuation_store import ValuationSnapshotStore
 
 
-def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_analysis(tmp_path):
+def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_analysis(tmp_path, monkeypatch):
     path = tmp_path / "demo.sqlite3"
+    def unexpected_market_call(*args, **kwargs):
+        raise AssertionError("Unexpected market request")
+
+    monkeypatch.setattr("urllib.request.urlopen", unexpected_market_call)
     with TestClient(create_app(str(path))) as client:
         page = client.get("/")
         assert page.status_code == 200
         assert 'id="refresh-prices">Actualizar precios' in page.text
         assert 'id="run">Analizar cartera' in page.text
-        assert client.get("/api/portfolio/valuation").json()["valuation"] is None
+        initial = client.get("/api/portfolio/valuation").json()
+        assert initial["portfolio"] == DEMO_PORTFOLIO.model_dump(mode="json")
+        assert len(initial["portfolio"]["positions"]) == 11
+        assert initial["valuation"] is None
+        with sqlite3.connect(path) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM valuation_snapshots").fetchone() == (0,)
+            assert connection.execute("SELECT COUNT(*) FROM analysis_runs").fetchone() == (0,)
 
         response = client.post("/api/portfolio/refresh-prices")
         assert response.status_code == 201
+        assert response.json()["portfolio"] == initial["portfolio"]
         valuation = response.json()["valuation"]
+        assert [row["position"] for row in valuation["positions"]] == initial["portfolio"]["positions"]
         assert UUID(valuation["snapshot_id"])
         assert valuation["status"] == "PARTIAL"
         assert valuation["total_value"] is None
@@ -36,17 +51,25 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
         assert db.process_one(str(path)) is None
 
     with TestClient(create_app(str(path))) as restarted:
-        assert restarted.get("/api/portfolio/valuation").json()["valuation"] == valuation
+        assert restarted.get("/api/portfolio/valuation").json() == response.json()
+        with sqlite3.connect(path) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM multiactive_portfolios").fetchone() == (1,)
 
 
 def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
     path = tmp_path / "demo.sqlite3"
+    db.init_db(str(path))
+    legacy = db.latest_version(str(path), "portfolio_versions")
+    edited = Portfolio.model_validate(legacy["data"]).model_copy(update={"name": "Cartera editada"})
+    db.save_version(str(path), "portfolio_versions", edited)
+    run = db.create_run(str(path))
+    assert db.process_one(str(path)) == run["id"]
+    report_id = db.get_run(str(path), run["id"])["report_id"]
+    original_report = db.get_report(str(path), report_id)
     with TestClient(create_app(str(path))) as client:
-        run = client.post("/api/analyses").json()
-        assert db.process_one(str(path)) == run["id"]
-        report_id = client.get(f"/api/analyses/{run['id']}").json()["report_id"]
-        original_report = client.get(f"/api/reports/{report_id}").json()
         original_portfolio = client.get("/api/portfolio").json()
+        assert original_portfolio["data"]["name"] == "Cartera editada"
+        assert client.get("/api/portfolio/valuation").json()["portfolio"]["positions"]
         first = client.post("/api/portfolio/refresh-prices").json()["valuation"]
         second = client.post("/api/portfolio/refresh-prices").json()["valuation"]
 
@@ -61,6 +84,30 @@ def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
         stored = ValuationSnapshotStore(path).get(first["snapshot_id"])
         assert stored is not None
         assert stored.model_dump(mode="json") == first
+
+
+def test_valuation_is_only_reused_for_the_active_portfolio_version(tmp_path):
+    path = tmp_path / "demo.sqlite3"
+    with TestClient(create_app(str(path))) as client:
+        first = client.post("/api/portfolio/refresh-prices").json()["valuation"]
+
+    store = ValuationSnapshotStore(path)
+    updated_position = DEMO_PORTFOLIO.positions[0].model_copy(update={"quantity": Decimal("12")})
+    updated = DEMO_PORTFOLIO.model_copy(update={
+        "version": 2,
+        "snapshot_id": "SIM-SNAPSHOT-2",
+        "positions": (updated_position, *DEMO_PORTFOLIO.positions[1:]),
+    })
+    store.save_portfolio(updated)
+    with TestClient(create_app(str(path))) as client:
+        initial = client.get("/api/portfolio/valuation").json()
+        assert initial["portfolio"] == updated.model_dump(mode="json")
+        assert initial["valuation"] is None
+        refreshed = client.post("/api/portfolio/refresh-prices").json()
+        assert refreshed["valuation"]["portfolio_snapshot_id"] == updated.snapshot_id
+        assert refreshed["valuation"]["portfolio_version"] == updated.version
+        assert refreshed["valuation"]["positions"][0]["position"]["quantity"] == "12"
+        assert store.get(first["snapshot_id"]).model_dump(mode="json") == first
 
 
 def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path):

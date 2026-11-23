@@ -98,9 +98,9 @@ python -m pytest -q tests/test_portfolio_valuation.py
 
 ## I1.4 · Refresco de precios en el dashboard
 
-Abre el dashboard y pulsa **Actualizar precios** en la sección multiactivo. El botón usa una cartera de referencia con identificadores reales y tenencias, precios y FX simulados. El estado inicial se lee de SQLite, con `valuation: null` antes del primer refresco. Cada petición simulada devuelve HTTP 201 y crea un snapshot propio. La demo muestra diez de once posiciones valoradas. Se identifica el valor conocido y el total queda indeterminado.
+Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio` y la última `valuation` del mismo identificador, versión y snapshot. Antes de pulsar **Actualizar precios**, la valoración puede ser `null` y los precios aparecen como pendientes. Cada refresco simulado devuelve HTTP 201 y crea un snapshot propio. La demo muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
 
-La cartera de referencia multiactivo tiene su propia versión de tenencias. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
+La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
 
 Una petición explícita con `?mode=live` devuelve HTTP 503 mientras esté pendiente la autorización de un proveedor de precios. El adaptador FX del BCE está disponible como módulo separado.
 

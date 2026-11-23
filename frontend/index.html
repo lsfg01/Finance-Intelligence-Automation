@@ -22,24 +22,23 @@
 <header><h1>Laboratorio de análisis de inversiones</h1><div class="sub">Primer incremento · Cartera versionada · Exposición trazable · Análisis bajo demanda</div></header>
 <main>
   <div class="alert"><strong>SIMULACIÓN.</strong> Precios, posiciones y noticias ficticios. Los identificadores de la cartera multiactivo se usan como referencia.</div>
-  <div class="cards">
-    <section class="card"><h2>Cartera</h2><p id="versions" class="muted">Cargando...</p><div id="positions"></div></section>
-    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div><hr style="border:0;border-top:1px solid #e5ebf0;margin:20px 0"><h2>Ejecutar análisis</h2><p class="small muted">Solo se genera al pulsar el botón. Worker independiente.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
-  </div>
   <section class="card" aria-labelledby="valuation-title">
-    <div class="pair"><h2 id="valuation-title">Valoración multiactivo simulada</h2><button id="refresh-prices">Actualizar precios</button></div>
+    <div class="pair"><h2 id="valuation-title">Cartera</h2><button id="refresh-prices">Actualizar precios</button></div>
+    <p id="versions" class="muted"></p>
     <p id="valuation-status" class="muted" role="status"></p>
     <div id="valuation" class="table-scroll"></div>
   </section>
+  <div class="cards">
+    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div></section>
+    <section class="card"><h2>Ejecutar análisis</h2><p class="small muted">Análisis de la cartera histórica I0, bajo demanda.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
+  </div>
   <section class="card"><div class="pair"><h2>Informe</h2><span id="report-version" class="pill" hidden></span></div><div id="report"><p class="muted">Aún no hay informe seleccionado. Ejecuta un análisis.</p></div></section>
 </main>
 <script>
 const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
 async function api(url, options){const response=await fetch(url,options); if(!response.ok){throw new Error((await response.text()).slice(0,250))}return response.json();}
 async function refresh(){
- const [portfolio,profile,reports] = await Promise.all([api('/api/portfolio'),api('/api/profile'),api('/api/reports')]);
- document.getElementById('versions').textContent = `Versión ${portfolio.version} · Moneda ${portfolio.data.base_currency}`;
- document.getElementById('positions').innerHTML='<table><thead><tr><th>Instrumento</th><th>Valor EUR</th><th>Fecha</th></tr></thead><tbody>'+portfolio.data.positions.map(p=>`<tr><td>${esc(p.name)}<div class="muted small">${esc(p.kind)} · ${esc(p.instrument_id)}</div></td><td>${fmt(Number(p.quantity)*Number(p.unit_price))}</td><td>${esc(p.price_at.slice(0,10))}<div class="muted small">${esc(p.price_source)}</div></td></tr>`).join('')+'</tbody></table>';
+ const [profile,reports] = await Promise.all([api('/api/profile'),api('/api/reports')]);
  document.getElementById('profile').innerHTML=`<p><strong>${esc(profile.data.name)}</strong> · versión ${profile.version}</p><p>Horizonte: ${esc(profile.data.horizon)}</p><p>Riesgo: ${esc(profile.data.risk_tolerance)}</p><p class="muted small">${profile.data.constraints.map(esc).join(' · ')}</p>`;
  if(reports.length){await showReport(reports[0].id)}
 }
@@ -56,35 +55,35 @@ const valuationIssues = {
  MISSING_FX:'Sin tipo de cambio',AMBIGUOUS_FX:'Tipo de cambio ambiguo'
 };
 const valuationAmount = (value, currency) => value === null ? '—' : `${fmt(value)} ${esc(currency)}`;
-function renderValuation({valuation, instruments, listings}){
- if(!valuation){
-  valuationStatus.textContent = 'Aún no hay una valoración guardada.';
-  return;
- }
- valuationStatus.textContent = `${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas · Cartera v${valuation.portfolio_version} · Datos del ${valuation.as_of}`;
+function renderValuation({portfolio, valuation, instruments, listings}){
+ document.getElementById('versions').textContent = `Demo multiactivo · Versión ${portfolio.version} · Moneda ${portfolio.base_currency}`;
+ valuationStatus.textContent = valuation
+  ? `${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas · Corte del ${valuation.as_of}`
+  : 'Precios pendientes. Aún no hay una valoración guardada.';
  const instrumentById = new Map(instruments.map(item=>[item.instrument_id,item]));
  const listingById = new Map(listings.map(item=>[item.listing_id,item]));
- const priceById = new Map(valuation.price_observations.map(item=>[item.observation_id,item]));
- const rows = valuation.positions.map(row=>{
-  const {position} = row;
+ const priceById = new Map((valuation?.price_observations ?? []).map(item=>[item.observation_id,item]));
+ const valueByPosition = new Map((valuation?.positions ?? []).map(row=>[row.position.position_id,row]));
+ const rows = portfolio.positions.map(position=>{
+  const row = valueByPosition.get(position.position_id);
   const instrument = instrumentById.get(position.instrument_id);
   const listing = listingById.get(position.listing_id);
-  const price = priceById.get(row.price_observation_id);
+  const price = priceById.get(row?.price_observation_id);
   const calendarDay = value => Date.parse(value.slice(0,10)+'T00:00:00Z');
   const age = price ? (calendarDay(valuation.calculated_at)-calendarDay(price.price_as_of))/86400000 : null;
   return `<tr><td><strong>${esc(instrument?.name ?? position.instrument_id)}</strong>
    <div class="muted small">${esc(listing ? listing.ticker+' · '+listing.mic : instrument?.isin ?? position.instrument_id)}</div></td>
    <td>${esc(position.quantity)}</td>
    <td>${price ? valuationAmount(price.value,price.currency) : '—'}</td>
-   <td>${valuationAmount(row.quote_value,row.quote_currency)}</td>
-   <td>${valuationAmount(row.base_value,valuation.base_currency)}</td>
+   <td>${valuationAmount(row?.quote_value ?? null,row?.quote_currency)}</td>
+   <td>${valuationAmount(row?.base_value ?? null,portfolio.base_currency)}</td>
    <td>${price ? `${esc(price.price_type)} · ${esc(price.price_as_of)}<div class="muted small">${esc(price.source)} · ${age} días</div>` : '—'}</td>
-   <td>${esc(row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada')}</td></tr>`;
+   <td>${esc(row ? (row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada') : 'Pendiente')}</td></tr>`;
  }).join('');
- const total = valuation.total_value === null ? 'Indeterminado' : valuationAmount(valuation.total_value,valuation.base_currency);
- valuationElement.innerHTML = `<div class="pair">
+ const summary = valuation ? `<div class="pair">
   <p><strong>Valor conocido</strong> ${valuationAmount(valuation.known_value,valuation.base_currency)}</p>
-  <p><strong>Total de cartera</strong> ${total}</p></div>
+  <p><strong>Total de cartera</strong> ${valuation.total_value === null ? 'Indeterminado' : valuationAmount(valuation.total_value,valuation.base_currency)}</p></div>` : '';
+ valuationElement.innerHTML = `${summary}
   <table aria-label="Posiciones de la cartera multiactivo"><thead><tr>
   <th>Instrumento</th><th>Cantidad</th><th>Último precio</th><th>Valor de posición</th>
   <th>Valor en moneda base</th><th>Fecha, fuente y antigüedad</th><th>Estado</th>
