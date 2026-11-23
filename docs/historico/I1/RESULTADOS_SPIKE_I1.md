@@ -1,6 +1,6 @@
 # I1.0 — Resultados del spike de datos de mercado
 
-**Decisión del 23 de noviembre de 2026.** EODHD queda seleccionado para precios y NAV de I1 y el BCE para FX. La habilitación compartida depende de las condiciones de uso, conservación y visualización aplicables al equipo. [ADR 0001](adr/0001-market-data-provider.md).
+**Decisión del 23 de noviembre de 2026.** EODHD queda seleccionado para precios y NAV de I1 y el BCE para FX. La habilitación compartida depende de las condiciones de uso, conservación y visualización aplicables al equipo. [ADR 0001](../../adr/0001-market-data-provider.md).
 
 ## Cotejo documental del 23 de noviembre de 2026
 
@@ -9,6 +9,8 @@
 | F02 · `IE00BYX5NX33` | 2026-11-20 | **13,4877 EUR** por participación | **NAV de la clase cotejado con Fidelity a dos decimales.** El cierre de I1 registra **13,49 EUR** en *Preis (NIW)* para el 20.11.2026 y **13,488 EUR** en el histórico de Investing.com. La ficha pública de Fidelity muestra el último NAV y puede cambiar de fecha. [Fidelity Alemania](https://www.fidelity.de/produkte-services/fonds-verschiedener-anbieter/fondsfinder/fondsportrait/?ISIN=IE00BYX5NX33&FIL_ONLY=0) · [Histórico de Investing.com](https://uk.investing.com/funds/ie00byx5nx33-historical-data). |
 
 Los resultados y los criterios indicados en cada ejecución anterior corresponden a la evidencia disponible en su fecha.
+
+**Ampliación K01 del 23 de noviembre de 2026.** Confirmado el símbolo `BTC-EUR.CC` del catálogo de EODHD. El histórico diario respondió HTTP 200 con siete observaciones válidas hasta el 22 de noviembre. Se usa el cierre de la última barra UTC completa como precio indicativo en EUR. [Catálogo de criptomonedas de EODHD](https://eodhd.com/financial-apis/list-supported-crypto-currencies).
 
 ## Repetición con cuenta EODHD Free
 

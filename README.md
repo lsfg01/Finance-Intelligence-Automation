@@ -2,6 +2,8 @@
 
 **Demo local con tenencias y noticias ficticias.** Funciona offline por defecto. El modo de mercado opcional consulta precios diarios de EODHD y tipos de cambio de referencia del BCE bajo demanda.
 
+Consulta el [acta de cierre de I1](docs/CIERRE_I1_CARTERA_Y_PRECIOS.md) para el alcance de la entrega y las comprobaciones realizadas.
+
 ## Arranque rápido con Docker (API + worker)
 
 ```bash
@@ -53,7 +55,7 @@ No hay todavía importador CSV, motor LLM, chat, autorización de usuarios, expo
 | `GET` | `/api/health` | Estado y modo de ejecución |
 | `GET`, `PUT` | `/api/portfolio` | Leer / crear versión de cartera |
 | `GET` | `/api/portfolio/valuation` | Leer las tenencias multiactivo activas y su última valoración guardada |
-| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración de la cartera activa a demanda con `mode=simulated` o `mode=live` |
+| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración a demanda. El modo automático usa la configuración del servidor. La API también admite `mode=simulated` y `mode=live` explícitos |
 | `GET`, `PUT` | `/api/profile` | Leer / crear versión de perfil |
 | `POST` | `/api/analyses` | Encolar nuevo análisis manual |
 | `GET` | `/api/analyses/{id}` | Estado, error, informe generado |
@@ -98,17 +100,19 @@ python -m pytest -q tests/test_portfolio_valuation.py
 
 ## I1.4 · Refresco de precios en el dashboard
 
-Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio` y la última `valuation` del mismo identificador, versión y snapshot. Antes de pulsar **Actualizar precios**, la valoración puede ser `null` y los precios aparecen como pendientes. Cada refresco simulado devuelve HTTP 201 y crea un snapshot propio. La demo muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
+Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio`, la última `valuation` del mismo identificador, versión y snapshot, y su `valuation_mode` (`simulated` o `live`). Si todavía no hay una valoración guardada, la pantalla muestra los precios pendientes. Cada refresco correcto devuelve HTTP 201 y crea un snapshot propio. La demo simulada muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
 
 La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
 
 ### Datos de mercado
 
-En un entorno autorizado para consultar, conservar y mostrar los datos, configura `ENABLE_LIVE_MARKET_DATA=1` y `EODHD_API_TOKEN` en el entorno del proceso API. Con Docker Compose puedes usar un archivo local `.env` ignorado por Git. Para Uvicorn local, exporta las variables antes de arrancar. Elige **Datos de mercado** y pulsa **Actualizar precios**. Si falta la habilitación o la credencial, el servidor devuelve HTTP 503.
+En un entorno autorizado para consultar, conservar y mostrar los datos, configura `ENABLE_LIVE_MARKET_DATA=1` y `EODHD_API_TOKEN` en el entorno del proceso API. Con Docker Compose puedes copiarlas desde `.env.example` a un archivo local `.env` ignorado por Git y recrear el servicio API con `docker compose up -d --build api`. Para Uvicorn local, exporta las variables antes de arrancar. Pulsa **Actualizar precios** para ejecutar el modo configurado en el servidor. Con mercado habilitado, una credencial ausente devuelve HTTP 503 y una credencial rechazada por EODHD devuelve HTTP 502. El modo simulado sigue disponible cuando el servidor funciona offline o mediante `?mode=simulated`.
 
-Se usa el NAV de la clase o el cierre diario sin ajustar del listing exacto, con hasta siete días naturales de antigüedad. La fecha efectiva de cada precio se muestra junto a su fuente. Para convertir USD a EUR se usa la tasa del BCE de la misma fecha que el precio. El importe conocido suma las posiciones valoradas. Las filas sin datos válidos conservan su motivo y el total queda indeterminado. Las observaciones de mercado se distinguen de las simuladas por observación, mientras que `valuation.is_simulated` sigue reflejando las tenencias ficticias.
+La valoración de mercado toma la fecha UTC del inicio del refresco. Se usa el último NAV de la clase o cierre diario sin ajustar del listing exacto dentro de los últimos siete días naturales. La fecha efectiva de cada precio se muestra junto a su fuente y puede ser anterior a la fecha de valoración. Para convertir USD a EUR se usa la tasa del BCE de la misma fecha que el precio. El importe conocido suma las posiciones valoradas. Las filas sin datos válidos conservan su motivo y el total queda indeterminado. La pantalla recupera de SQLite la fecha y el modo guardados de la valoración.
 
 Cada refresco de mercado consulta una vez por símbolo resuelto y solicita FX por combinación necesaria de moneda y fecha. Los fallos de proveedor dejan la fila sin observación, con `MISSING_PRICE` o `MISSING_FX` según corresponda. El modo de mercado conserva sus snapshots en el volumen local. Consulta el [ADR de proveedor](docs/adr/0001-market-data-provider.md) antes de compartir el acceso o el volumen.
+
+Para Bitcoin, EODHD publica el par `BTC-EUR.CC`. Se usa como precio indicativo en EUR el cierre de su última barra diaria completa, con corte al día anterior en UTC. [Catálogo de criptomonedas de EODHD](https://eodhd.com/financial-apis/list-supported-crypto-currencies).
 
 ```bash
 python -m pytest -q tests/test_portfolio_refresh.py tests/test_portfolio_market_refresh.py

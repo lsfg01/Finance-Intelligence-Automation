@@ -8,12 +8,14 @@ from app.market_data.ecb import ECBFXProvider
 from app.market_data.eodhd import EODHDPriceProvider
 
 from .fixtures import DEMO_AS_OF, DEMO_INSTRUMENTS, DEMO_LISTINGS, FixtureMarketDataProvider
-from .models import FXObservation, MarketObservation, PortfolioSnapshot
+from .models import FXObservation, MarketObservation, PortfolioSnapshot, PriceType
 from .valuation import ValuationSnapshot, value_portfolio
 from .valuation_store import ValuationSnapshotStore
 
 
-# Identidad por clase exacta o por listing, contrastada en la matriz I1.0.
+BITCOIN_EUR_SYMBOL = "BTC-EUR.CC"
+
+# Identidades contrastadas en la matriz del spike y su ampliación.
 EODHD_SYMBOLS = {
     ("F01", None): "IE00B03HD191.EUFUND",
     ("F02", None): "IE00BYX5NX33.EUFUND",
@@ -26,8 +28,13 @@ EODHD_SYMBOLS = {
     ("A01", "A01-XMAD"): "IBE.MC",
     ("A02", "A02-XNAS"): "MSFT.US",
     ("C01", "C01-XETR"): "PPFB.XETRA",
+    ("K01", None): BITCOIN_EUR_SYMBOL,
 }
 LIVE_MAX_PRICE_AGE_DAYS = 7
+
+
+class MarketCredentialsRejected(Exception):
+    """EODHD no acepta la credencial configurada."""
 
 
 def refresh_demo_prices(store: ValuationSnapshotStore, portfolio: PortfolioSnapshot) -> ValuationSnapshot:
@@ -49,7 +56,7 @@ def refresh_demo_prices(store: ValuationSnapshotStore, portfolio: PortfolioSnaps
         as_of=max(DEMO_AS_OF, portfolio.as_of),
         calculated_at=datetime.now(timezone.utc),
     )
-    store.save(snapshot)
+    store.save(snapshot, mode="simulated")
     return snapshot
 
 
@@ -64,20 +71,33 @@ def refresh_market_prices(
     listings = {item.listing_id: item for item in DEMO_LISTINGS}
     quotes: list[MarketObservation] = []
     keys = dict.fromkeys((position.instrument_id, position.listing_id) for position in portfolio.positions)
-    for (instrument_id, listing_id) in keys:
+    for instrument_id, listing_id in keys:
         symbol = EODHD_SYMBOLS.get((instrument_id, listing_id))
         if symbol is None:
             continue
-        currency = listings[listing_id].currency if listing_id else instruments[instrument_id].share_class_currency
+        end = as_of
+        if symbol == BITCOIN_EUR_SYMBOL:
+            currency = "EUR"
+            price_type = PriceType.INDICATIVE
+            # EODHD incluye una barra todavía abierta para el día UTC en curso.
+            end -= timedelta(days=1)
+        elif listing_id:
+            currency = listings[listing_id].currency
+            price_type = PriceType.EOD_CLOSE
+        else:
+            currency = instruments[instrument_id].share_class_currency
+            price_type = PriceType.NAV
         if currency is None:
             continue
         try:
             price = provider.get_latest(
                 symbol=symbol, instrument_id=instrument_id, listing_id=listing_id,
-                currency=currency, start=start, end=as_of,
+                currency=currency, price_type=price_type, start=start, end=end,
             )
         except HTTPError as error:
             error.close()
+            if error.code == 401:
+                raise MarketCredentialsRejected from None
             continue
         except (OSError, ValueError, HTTPException):
             continue
@@ -109,5 +129,5 @@ def refresh_market_prices(
         calculated_at=datetime.now(timezone.utc),
         max_price_age_days=LIVE_MAX_PRICE_AGE_DAYS,
     )
-    store.save(snapshot)
+    store.save(snapshot, mode="live")
     return snapshot

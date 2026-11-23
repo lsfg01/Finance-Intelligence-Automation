@@ -1,9 +1,13 @@
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+from typing import Literal
 
 from .models import PortfolioSnapshot
 from .valuation import ValuationSnapshot
+
+
+PriceMode = Literal["simulated", "live"]
 
 
 class ValuationSnapshotStore:
@@ -27,6 +31,14 @@ class ValuationSnapshotStore:
                 CREATE TABLE IF NOT EXISTS valuation_snapshots (
                     snapshot_id TEXT PRIMARY KEY,
                     payload TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS valuation_snapshot_modes (
+                    snapshot_id TEXT PRIMARY KEY REFERENCES valuation_snapshots(snapshot_id),
+                    mode TEXT NOT NULL CHECK (mode IN ('simulated', 'live'))
                 )
                 """
             )
@@ -59,7 +71,7 @@ class ValuationSnapshotStore:
             ).fetchone()
         return PortfolioSnapshot.model_validate_json(row[0]) if row else None
 
-    def save(self, snapshot: ValuationSnapshot) -> None:
+    def save(self, snapshot: ValuationSnapshot, *, mode: PriceMode | None = None) -> None:
         payload = snapshot.model_dump_json()
         with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.execute(
@@ -75,6 +87,20 @@ class ValuationSnapshotStore:
             ).fetchone()
             if existing != (payload,):
                 raise ValueError(f"valuation snapshot id already used: {snapshot.snapshot_id}")
+            if mode is not None:
+                connection.execute(
+                    """
+                    INSERT INTO valuation_snapshot_modes (snapshot_id, mode) VALUES (?, ?)
+                    ON CONFLICT(snapshot_id) DO NOTHING
+                    """,
+                    (snapshot.snapshot_id, mode),
+                )
+                existing_mode = connection.execute(
+                    "SELECT mode FROM valuation_snapshot_modes WHERE snapshot_id = ?",
+                    (snapshot.snapshot_id,),
+                ).fetchone()
+                if existing_mode != (mode,):
+                    raise ValueError(f"valuation snapshot mode already set: {snapshot.snapshot_id}")
 
     def get(self, snapshot_id: str) -> ValuationSnapshot | None:
         with closing(sqlite3.connect(self.path)) as connection:
@@ -84,16 +110,19 @@ class ValuationSnapshotStore:
             ).fetchone()
         return ValuationSnapshot.model_validate_json(row[0]) if row else None
 
-    def latest_for_portfolio(self, portfolio: PortfolioSnapshot) -> ValuationSnapshot | None:
+    def latest_for_portfolio(
+        self, portfolio: PortfolioSnapshot
+    ) -> tuple[ValuationSnapshot | None, PriceMode | None]:
         with closing(sqlite3.connect(self.path)) as connection:
             row = connection.execute(
                 """
-                SELECT payload FROM valuation_snapshots
+                SELECT payload, mode FROM valuation_snapshots
+                LEFT JOIN valuation_snapshot_modes USING (snapshot_id)
                 WHERE json_extract(payload, '$.portfolio_id') = ?
                   AND json_extract(payload, '$.portfolio_version') = ?
                   AND json_extract(payload, '$.portfolio_snapshot_id') = ?
-                ORDER BY rowid DESC LIMIT 1
+                ORDER BY valuation_snapshots.rowid DESC LIMIT 1
                 """,
                 (portfolio.portfolio_id, portfolio.version, portfolio.snapshot_id),
             ).fetchone()
-        return ValuationSnapshot.model_validate_json(row[0]) if row else None
+        return (ValuationSnapshot.model_validate_json(row[0]), row[1]) if row else (None, None)

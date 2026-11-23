@@ -25,17 +25,11 @@
   <section class="card" aria-labelledby="valuation-title">
     <div class="pair">
       <h2 id="valuation-title">Cartera</h2>
-      <div>
-        <label for="price-mode">Fuente de precios</label>
-        <select id="price-mode">
-          <option value="simulated">Datos simulados</option>
-          <option value="live">Datos de mercado</option>
-        </select>
-        <button id="refresh-prices">Actualizar precios</button>
-      </div>
+      <button id="refresh-prices">Actualizar precios</button>
     </div>
     <p id="versions" class="muted"></p>
-    <p id="valuation-status" class="muted" role="status"></p>
+    <p id="valuation-status" class="muted" role="status">Cargando cartera…</p>
+    <p id="refresh-status" class="muted" role="status" hidden></p>
     <div id="valuation" class="table-scroll"></div>
   </section>
   <div class="cards">
@@ -46,7 +40,12 @@
 </main>
 <script>
 const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
-async function api(url, options){const response=await fetch(url,options); if(!response.ok){throw new Error((await response.text()).slice(0,250))}return response.json();}
+async function api(url, options){
+ const response = await fetch(url, options);
+ if(response.ok) return response.json();
+ const data = await response.json().catch(()=>null);
+ throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${response.status}`);
+}
 async function refresh(){
  const [profile,reports] = await Promise.all([api('/api/profile'),api('/api/reports')]);
  document.getElementById('profile').innerHTML=`<p><strong>${esc(profile.data.name)}</strong> · versión ${profile.version}</p><p>Horizonte: ${esc(profile.data.horizon)}</p><p>Riesgo: ${esc(profile.data.risk_tolerance)}</p><p class="muted small">${profile.data.constraints.map(esc).join(' · ')}</p>`;
@@ -54,22 +53,23 @@ async function refresh(){
 }
 function esc(x){return String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 const priceButton = document.getElementById('refresh-prices');
-const priceMode = document.getElementById('price-mode');
+const refreshStatus = document.getElementById('refresh-status');
 const valuationStatus = document.getElementById('valuation-status');
 const valuationElement = document.getElementById('valuation');
-const valuationStates = {COMPLETE:'Completa',PARTIAL:'Parcial',MISSING:'Sin valoración'};
+const valuationStates = {COMPLETE:'Completa',PARTIAL:'Parcial',MISSING:'Sin posiciones valoradas'};
+const priceTypes = {NAV:'Valor liquidativo',EOD_CLOSE:'Cierre diario',LAST:'Última cotización',INDICATIVE:'Precio indicativo'};
 const valuationIssues = {
  UNKNOWN_INSTRUMENT:'Instrumento desconocido',UNSUPPORTED_ASSET:'Activo sin método de valoración',
  AMBIGUOUS_LISTING:'Plaza ambigua',MISSING_LISTING:'Falta la plaza',INVALID_LISTING:'Plaza inválida',
- MISSING_PRICE:'Sin precio',STALE_PRICE:'Precio desactualizado',
+ MISSING_PRICE:'Sin precio disponible',STALE_PRICE:'Precio desactualizado',
  PRICE_CURRENCY_MISMATCH:'La moneda del precio no coincide',AMBIGUOUS_PRICE:'Precio ambiguo',
- MISSING_FX:'Sin tipo de cambio',AMBIGUOUS_FX:'Tipo de cambio ambiguo'
+ MISSING_FX:'Sin tipo de cambio para la fecha del precio',AMBIGUOUS_FX:'Tipo de cambio ambiguo'
 };
 const valuationAmount = (value, currency) => value === null ? '—' : `${fmt(value)} ${esc(currency)}`;
-function renderValuation({portfolio, valuation, instruments, listings}){
+function renderValuation({portfolio, valuation, valuation_mode, instruments, listings}){
  document.getElementById('versions').textContent = `Demo multiactivo · Versión ${portfolio.version} · Moneda ${portfolio.base_currency}`;
  valuationStatus.textContent = valuation
-  ? `${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas · Corte del ${valuation.as_of}`
+  ? `Precios ${valuation_mode === 'live' ? 'de mercado' : 'simulados'} · Fecha de valoración ${valuation.as_of} · ${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas`
   : 'Precios pendientes. Aún no hay una valoración guardada.';
  const instrumentById = new Map(instruments.map(item=>[item.instrument_id,item]));
  const listingById = new Map(listings.map(item=>[item.listing_id,item]));
@@ -88,7 +88,7 @@ function renderValuation({portfolio, valuation, instruments, listings}){
    <td>${price ? `${esc(price.value.replace('.', ','))} ${esc(price.currency)}` : '—'}</td>
    <td>${valuationAmount(row?.quote_value ?? null,row?.quote_currency)}</td>
    <td>${valuationAmount(row?.base_value ?? null,portfolio.base_currency)}</td>
-   <td>${price ? `${esc(price.price_type)} · ${esc(price.price_as_of)}
+   <td>${price ? `${esc(priceTypes[price.price_type] ?? price.price_type)} · ${esc(price.price_as_of)}
     <div class="muted small">${price.is_simulated ? 'Simulado' : 'Mercado'} · ${esc(price.provider)}<br>${esc(price.source)}</div>` : '—'}
     ${fx ? `<div class="muted small">FX · ${esc(fx.provider)} · ${esc(fx.as_of)}<br>${esc(fx.source)}</div>` : ''}</td>
    <td>${esc(row ? (row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada') : 'Pendiente')}</td></tr>`;
@@ -104,16 +104,19 @@ function renderValuation({portfolio, valuation, instruments, listings}){
 }
 async function loadValuation(refreshPrices){
  priceButton.disabled = true;
- priceMode.disabled = true;
- valuationStatus.textContent = refreshPrices ? 'Actualizando precios…' : 'Cargando valoración…';
+ if(refreshPrices){
+  refreshStatus.hidden = false;
+  refreshStatus.textContent = 'Actualizando precios…';
+ }
  try{
-  const url = refreshPrices ? '/api/portfolio/refresh-prices?mode='+priceMode.value : '/api/portfolio/valuation';
+  const url = refreshPrices ? '/api/portfolio/refresh-prices' : '/api/portfolio/valuation';
   renderValuation(await api(url, refreshPrices ? {method:'POST'} : undefined));
+  refreshStatus.hidden = true;
  }catch(error){
-  valuationStatus.textContent = 'Error de valoración: '+error.message;
+  const target = refreshPrices ? refreshStatus : valuationStatus;
+  target.textContent = (refreshPrices ? 'No se pudieron actualizar los precios. ' : 'No se pudo cargar la cartera. ')+error.message;
  }finally{
   priceButton.disabled = false;
-  priceMode.disabled = false;
  }
 }
 priceButton.addEventListener('click',()=>loadValuation(true));

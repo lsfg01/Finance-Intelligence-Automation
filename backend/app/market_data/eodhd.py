@@ -26,6 +26,7 @@ class EODHDPriceProvider:
         instrument_id: str,
         listing_id: str | None,
         currency: str,
+        price_type: PriceType,
         start: date,
         end: date,
     ) -> MarketObservation | None:
@@ -65,7 +66,7 @@ class EODHDPriceProvider:
             listing_id=listing_id,
             value=closes[effective_date],
             currency=currency,
-            price_type=PriceType.EOD_CLOSE if listing_id else PriceType.NAV,
+            price_type=price_type,
             price_as_of=effective_date,
             retrieved_at=retrieved_at,
             provider="EODHD",

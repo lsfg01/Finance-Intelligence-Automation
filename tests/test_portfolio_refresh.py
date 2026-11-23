@@ -9,6 +9,7 @@ from app import db
 from app.main import create_app
 from app.models import Portfolio
 from app.portfolio.fixtures import DEMO_PORTFOLIO
+from app.portfolio.valuation import ValuationSnapshot
 from app.portfolio.valuation_store import ValuationSnapshotStore
 
 
@@ -19,6 +20,7 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
         raise AssertionError("Unexpected market request")
 
     monkeypatch.setattr("urllib.request.urlopen", unexpected_market_call)
+    monkeypatch.delenv("ENABLE_LIVE_MARKET_DATA", raising=False)
     with TestClient(create_app(str(path))) as client:
         page = client.get("/")
         assert page.status_code == 200
@@ -35,6 +37,7 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
         response = client.post("/api/portfolio/refresh-prices")
         assert response.status_code == 201
         assert response.json()["portfolio"] == initial["portfolio"]
+        assert response.json()["valuation_mode"] == "simulated"
         valuation = response.json()["valuation"]
         assert [row["position"] for row in valuation["positions"]] == initial["portfolio"]["positions"]
         assert UUID(valuation["snapshot_id"])
@@ -72,8 +75,8 @@ def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
         original_portfolio = client.get("/api/portfolio").json()
         assert original_portfolio["data"]["name"] == "Cartera editada"
         assert client.get("/api/portfolio/valuation").json()["portfolio"]["positions"]
-        first = client.post("/api/portfolio/refresh-prices").json()["valuation"]
-        second = client.post("/api/portfolio/refresh-prices").json()["valuation"]
+        first = client.post("/api/portfolio/refresh-prices?mode=simulated").json()["valuation"]
+        second = client.post("/api/portfolio/refresh-prices?mode=simulated").json()["valuation"]
 
         assert first["snapshot_id"] != second["snapshot_id"]
         assert first["portfolio_snapshot_id"] == second["portfolio_snapshot_id"]
@@ -91,7 +94,7 @@ def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
 def test_valuation_is_only_reused_for_the_active_portfolio_version(tmp_path):
     path = tmp_path / "demo.sqlite3"
     with TestClient(create_app(str(path))) as client:
-        first = client.post("/api/portfolio/refresh-prices").json()["valuation"]
+        first = client.post("/api/portfolio/refresh-prices?mode=simulated").json()["valuation"]
 
     store = ValuationSnapshotStore(path)
     updated_position = DEMO_PORTFOLIO.positions[0].model_copy(update={"quantity": Decimal("12")})
@@ -105,11 +108,21 @@ def test_valuation_is_only_reused_for_the_active_portfolio_version(tmp_path):
         initial = client.get("/api/portfolio/valuation").json()
         assert initial["portfolio"] == updated.model_dump(mode="json")
         assert initial["valuation"] is None
-        refreshed = client.post("/api/portfolio/refresh-prices").json()
+        refreshed = client.post("/api/portfolio/refresh-prices?mode=simulated").json()
         assert refreshed["valuation"]["portfolio_snapshot_id"] == updated.snapshot_id
         assert refreshed["valuation"]["portfolio_version"] == updated.version
         assert refreshed["valuation"]["positions"][0]["position"]["quantity"] == "12"
         assert store.get(first["snapshot_id"]).model_dump(mode="json") == first
+
+
+def test_valuation_from_before_mode_tracking_is_still_labeled(tmp_path):
+    with TestClient(create_app(str(tmp_path / "source.sqlite3"))) as client:
+        original = client.post("/api/portfolio/refresh-prices?mode=simulated").json()
+
+    path = tmp_path / "legacy.sqlite3"
+    ValuationSnapshotStore(path).save(ValuationSnapshot.model_validate(original["valuation"]))
+    with TestClient(create_app(str(path))) as client:
+        assert client.get("/api/portfolio/valuation").json() == original
 
 
 def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path, monkeypatch):
@@ -123,3 +136,7 @@ def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path, m
         monkeypatch.setenv("ENABLE_LIVE_MARKET_DATA", "1")
         monkeypatch.delenv("EODHD_API_TOKEN")
         assert client.post("/api/portfolio/refresh-prices?mode=live").status_code == 503
+        auto = client.post("/api/portfolio/refresh-prices")
+        assert auto.status_code == 503
+        assert auto.json()["detail"] == "Falta configurar EODHD_API_TOKEN"
+        assert client.get("/api/portfolio/valuation").json()["valuation"] is None

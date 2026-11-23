@@ -97,6 +97,8 @@ El incremento 0.1 usa rutas `/api/*` simplificadas; migrar a `/v1/*` con OpenAPI
 
 ## Backlog incremental sugerido
 
+La tabla recoge la secuencia prevista inicialmente. La entrega de cartera y datos de mercado se documenta en el [cierre de I1](CIERRE_I1_CARTERA_Y_PRECIOS.md). La importación de posiciones desde CSV queda para un incremento posterior.
+
 | Iteración | Resultado observable | Criterio de salida |
 |---|---|---|
 | I0 (entregado) | Cartera/perfil demo, exposición directa + ETF, cola, informe congelado | Tests de cálculo/versiones, botón manual, sin claves |
