@@ -44,6 +44,8 @@ pytest -q
 
 No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, autorización, estimación de FX, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración: antes de servir múltiples usuarios se necesita una infraestructura transaccional adecuada, control de acceso, migraciones y auditoría ampliada. La interfaz demuestra la lectura, no la edición del perfil/cartera, aunque la API permite nuevas versiones.
 
+El paquete experimental `backend/app/intelligence/` ofrece una demo independiente con contrato propuesto y un modelo local opcional mediante Ollama. No está conectado a la API, al worker ni a los informes de esta aplicación. Véanse [uso de inteligencia](docs/USO_INTELIGENCIA.md) y [contrato propuesto](docs/CONTRATO_DATOS_UNIFICADO.md).
+
 **No exponer esta demo directamente a Internet:** los endpoints de escritura no tienen autenticación.
 
 ## API
