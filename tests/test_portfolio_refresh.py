@@ -1,5 +1,6 @@
-from decimal import Decimal
 import sqlite3
+from contextlib import closing
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,7 @@ from app.portfolio.valuation_store import ValuationSnapshotStore
 
 def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_analysis(tmp_path, monkeypatch):
     path = tmp_path / "demo.sqlite3"
+
     def unexpected_market_call(*args, **kwargs):
         raise AssertionError("Unexpected market request")
 
@@ -26,7 +28,7 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
         assert initial["portfolio"] == DEMO_PORTFOLIO.model_dump(mode="json")
         assert len(initial["portfolio"]["positions"]) == 11
         assert initial["valuation"] is None
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection:
             assert connection.execute("SELECT COUNT(*) FROM valuation_snapshots").fetchone() == (0,)
             assert connection.execute("SELECT COUNT(*) FROM analysis_runs").fetchone() == (0,)
 
@@ -52,7 +54,7 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
 
     with TestClient(create_app(str(path))) as restarted:
         assert restarted.get("/api/portfolio/valuation").json() == response.json()
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection:
             assert connection.execute("SELECT COUNT(*) FROM multiactive_portfolios").fetchone() == (1,)
 
 
@@ -110,9 +112,14 @@ def test_valuation_is_only_reused_for_the_active_portfolio_version(tmp_path):
         assert store.get(first["snapshot_id"]).model_dump(mode="json") == first
 
 
-def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path):
+def test_live_refresh_returns_explicit_error_and_creates_no_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("EODHD_API_TOKEN", "test-only")
+    monkeypatch.delenv("ENABLE_LIVE_MARKET_DATA", raising=False)
     with TestClient(create_app(str(tmp_path / "demo.sqlite3"))) as client:
         response = client.post("/api/portfolio/refresh-prices?mode=live")
         assert response.status_code == 503
         assert response.json() == {"detail": "Sin proveedor autorizado de precios reales"}
         assert client.get("/api/portfolio/valuation").json()["valuation"] is None
+        monkeypatch.setenv("ENABLE_LIVE_MARKET_DATA", "1")
+        monkeypatch.delenv("EODHD_API_TOKEN")
+        assert client.post("/api/portfolio/refresh-prices?mode=live").status_code == 503

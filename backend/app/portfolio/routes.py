@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -6,7 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from .fixtures import DEMO_INSTRUMENTS, DEMO_LISTINGS, DEMO_PORTFOLIO
 from .models import DomainModel, Instrument, Listing, PortfolioSnapshot
-from .refresh import refresh_demo_prices
+from .refresh import refresh_demo_prices, refresh_market_prices
 from .valuation import ValuationSnapshot
 from .valuation_store import ValuationSnapshotStore
 
@@ -43,9 +44,14 @@ def valuation_router(database_path: Path) -> APIRouter:
 
     @router.post("/refresh-prices", status_code=status.HTTP_201_CREATED)
     def refresh_prices(mode: Literal["simulated", "live"] = "simulated") -> PortfolioValuationResponse:
-        if mode == "live":
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sin proveedor autorizado de precios reales")
         portfolio = active_portfolio()
-        return PortfolioValuationResponse(portfolio=portfolio, valuation=refresh_demo_prices(store, portfolio))
+        if mode == "live":
+            token = os.environ.get("EODHD_API_TOKEN", "").strip()
+            if not token or os.environ.get("ENABLE_LIVE_MARKET_DATA") != "1":
+                raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sin proveedor autorizado de precios reales")
+            valuation = refresh_market_prices(store, portfolio, token)
+        else:
+            valuation = refresh_demo_prices(store, portfolio)
+        return PortfolioValuationResponse(portfolio=portfolio, valuation=valuation)
 
     return router

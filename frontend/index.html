@@ -21,9 +21,19 @@
 <body>
 <header><h1>Laboratorio de análisis de inversiones</h1><div class="sub">Primer incremento · Cartera versionada · Exposición trazable · Análisis bajo demanda</div></header>
 <main>
-  <div class="alert"><strong>SIMULACIÓN.</strong> Precios, posiciones y noticias ficticios. Los identificadores de la cartera multiactivo se usan como referencia.</div>
+  <div class="alert"><strong>SIMULACIÓN.</strong> Las posiciones y noticias son ficticias. La tabla identifica el origen y la fecha de cada precio.</div>
   <section class="card" aria-labelledby="valuation-title">
-    <div class="pair"><h2 id="valuation-title">Cartera</h2><button id="refresh-prices">Actualizar precios</button></div>
+    <div class="pair">
+      <h2 id="valuation-title">Cartera</h2>
+      <div>
+        <label for="price-mode">Fuente de precios</label>
+        <select id="price-mode">
+          <option value="simulated">Datos simulados</option>
+          <option value="live">Datos de mercado</option>
+        </select>
+        <button id="refresh-prices">Actualizar precios</button>
+      </div>
+    </div>
     <p id="versions" class="muted"></p>
     <p id="valuation-status" class="muted" role="status"></p>
     <div id="valuation" class="table-scroll"></div>
@@ -44,6 +54,7 @@ async function refresh(){
 }
 function esc(x){return String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 const priceButton = document.getElementById('refresh-prices');
+const priceMode = document.getElementById('price-mode');
 const valuationStatus = document.getElementById('valuation-status');
 const valuationElement = document.getElementById('valuation');
 const valuationStates = {COMPLETE:'Completa',PARTIAL:'Parcial',MISSING:'Sin valoración'};
@@ -63,21 +74,23 @@ function renderValuation({portfolio, valuation, instruments, listings}){
  const instrumentById = new Map(instruments.map(item=>[item.instrument_id,item]));
  const listingById = new Map(listings.map(item=>[item.listing_id,item]));
  const priceById = new Map((valuation?.price_observations ?? []).map(item=>[item.observation_id,item]));
+ const fxById = new Map((valuation?.fx_observations ?? []).map(item=>[item.observation_id,item]));
  const valueByPosition = new Map((valuation?.positions ?? []).map(row=>[row.position.position_id,row]));
  const rows = portfolio.positions.map(position=>{
   const row = valueByPosition.get(position.position_id);
   const instrument = instrumentById.get(position.instrument_id);
   const listing = listingById.get(position.listing_id);
   const price = priceById.get(row?.price_observation_id);
-  const calendarDay = value => Date.parse(value.slice(0,10)+'T00:00:00Z');
-  const age = price ? (calendarDay(valuation.calculated_at)-calendarDay(price.price_as_of))/86400000 : null;
+  const fx = fxById.get(row?.fx_observation_id);
   return `<tr><td><strong>${esc(instrument?.name ?? position.instrument_id)}</strong>
    <div class="muted small">${esc(listing ? listing.ticker+' · '+listing.mic : instrument?.isin ?? position.instrument_id)}</div></td>
    <td>${esc(position.quantity)}</td>
-   <td>${price ? valuationAmount(price.value,price.currency) : '—'}</td>
+   <td>${price ? `${esc(price.value.replace('.', ','))} ${esc(price.currency)}` : '—'}</td>
    <td>${valuationAmount(row?.quote_value ?? null,row?.quote_currency)}</td>
    <td>${valuationAmount(row?.base_value ?? null,portfolio.base_currency)}</td>
-   <td>${price ? `${esc(price.price_type)} · ${esc(price.price_as_of)}<div class="muted small">${esc(price.source)} · ${age} días</div>` : '—'}</td>
+   <td>${price ? `${esc(price.price_type)} · ${esc(price.price_as_of)}
+    <div class="muted small">${price.is_simulated ? 'Simulado' : 'Mercado'} · ${esc(price.provider)}<br>${esc(price.source)}</div>` : '—'}
+    ${fx ? `<div class="muted small">FX · ${esc(fx.provider)} · ${esc(fx.as_of)}<br>${esc(fx.source)}</div>` : ''}</td>
    <td>${esc(row ? (row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada') : 'Pendiente')}</td></tr>`;
  }).join('');
  const summary = valuation ? `<div class="pair">
@@ -85,20 +98,22 @@ function renderValuation({portfolio, valuation, instruments, listings}){
   <p><strong>Total de cartera</strong> ${valuation.total_value === null ? 'Indeterminado' : valuationAmount(valuation.total_value,valuation.base_currency)}</p></div>` : '';
  valuationElement.innerHTML = `${summary}
   <table aria-label="Posiciones de la cartera multiactivo"><thead><tr>
-  <th>Instrumento</th><th>Cantidad</th><th>Último precio</th><th>Valor de posición</th>
-  <th>Valor en moneda base</th><th>Fecha, fuente y antigüedad</th><th>Estado</th>
+  <th>Instrumento</th><th>Cantidad</th><th>Precio</th><th>Valor de posición</th>
+  <th>Valor en moneda base</th><th>Fecha y fuente</th><th>Estado</th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 }
 async function loadValuation(refreshPrices){
  priceButton.disabled = true;
- valuationStatus.textContent = refreshPrices ? 'Actualizando precios simulados…' : 'Cargando valoración…';
+ priceMode.disabled = true;
+ valuationStatus.textContent = refreshPrices ? 'Actualizando precios…' : 'Cargando valoración…';
  try{
-  const url = refreshPrices ? '/api/portfolio/refresh-prices' : '/api/portfolio/valuation';
+  const url = refreshPrices ? '/api/portfolio/refresh-prices?mode='+priceMode.value : '/api/portfolio/valuation';
   renderValuation(await api(url, refreshPrices ? {method:'POST'} : undefined));
  }catch(error){
   valuationStatus.textContent = 'Error de valoración: '+error.message;
  }finally{
   priceButton.disabled = false;
+  priceMode.disabled = false;
  }
 }
 priceButton.addEventListener('click',()=>loadValuation(true));

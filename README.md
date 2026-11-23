@@ -1,6 +1,6 @@
 # Análisis de inversiones — incremento 0.1
 
-**Demo funcional OFFLINE con datos 100 % inventados.** Ninguna API de bróker, proveedor de precios, crawler o modelo de IA está conectada. No ejecuta operaciones ni formula recomendaciones utilizables en mercados reales.
+**Demo local con tenencias y noticias ficticias.** Funciona offline por defecto. El modo de mercado opcional consulta precios diarios de EODHD y tipos de cambio de referencia del BCE bajo demanda.
 
 ## Arranque rápido con Docker (API + worker)
 
@@ -42,7 +42,7 @@ pytest -q
 
 ## Limitaciones deliberadas de este incremento
 
-No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, autorización, estimación de FX, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración: antes de servir múltiples usuarios se necesita una infraestructura transaccional adecuada, control de acceso, migraciones y auditoría ampliada. La interfaz demuestra la lectura, no la edición del perfil/cartera, aunque la API permite nuevas versiones.
+No hay todavía importador CSV, motor LLM, chat, autorización de usuarios, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración: antes de servir múltiples usuarios se necesita una infraestructura transaccional adecuada, control de acceso, migraciones y auditoría ampliada. La interfaz demuestra la lectura, no la edición del perfil/cartera, aunque la API de I0 permite nuevas versiones.
 
 **No exponer esta demo directamente a Internet:** los endpoints de escritura no tienen autenticación.
 
@@ -52,8 +52,8 @@ No hay todavía conexión a fuentes reales, importador CSV, motor LLM, chat, aut
 |---|---|---|
 | `GET` | `/api/health` | Estado y modo de ejecución |
 | `GET`, `PUT` | `/api/portfolio` | Leer / crear versión de cartera |
-| `GET` | `/api/portfolio/valuation` | Leer la última valoración multiactivo guardada |
-| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración multiactivo simulada a demanda |
+| `GET` | `/api/portfolio/valuation` | Leer las tenencias multiactivo activas y su última valoración guardada |
+| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración de la cartera activa a demanda con `mode=simulated` o `mode=live` |
 | `GET`, `PUT` | `/api/profile` | Leer / crear versión de perfil |
 | `POST` | `/api/analyses` | Encolar nuevo análisis manual |
 | `GET` | `/api/analyses/{id}` | Estado, error, informe generado |
@@ -102,8 +102,14 @@ Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades 
 
 La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
 
-Una petición explícita con `?mode=live` devuelve HTTP 503 mientras esté pendiente la autorización de un proveedor de precios. El adaptador FX del BCE está disponible como módulo separado.
+### Datos de mercado
+
+En un entorno autorizado para consultar, conservar y mostrar los datos, configura `ENABLE_LIVE_MARKET_DATA=1` y `EODHD_API_TOKEN` en el entorno del proceso API. Con Docker Compose puedes usar un archivo local `.env` ignorado por Git. Para Uvicorn local, exporta las variables antes de arrancar. Elige **Datos de mercado** y pulsa **Actualizar precios**. Si falta la habilitación o la credencial, el servidor devuelve HTTP 503.
+
+Se usa el NAV de la clase o el cierre diario sin ajustar del listing exacto, con hasta siete días naturales de antigüedad. La fecha efectiva de cada precio se muestra junto a su fuente. Para convertir USD a EUR se usa la tasa del BCE de la misma fecha que el precio. El importe conocido suma las posiciones valoradas. Las filas sin datos válidos conservan su motivo y el total queda indeterminado. Las observaciones de mercado se distinguen de las simuladas por observación, mientras que `valuation.is_simulated` sigue reflejando las tenencias ficticias.
+
+Cada refresco de mercado consulta una vez por símbolo resuelto y solicita FX por combinación necesaria de moneda y fecha. Los fallos de proveedor dejan la fila sin observación, con `MISSING_PRICE` o `MISSING_FX` según corresponda. El modo de mercado conserva sus snapshots en el volumen local. Consulta el [ADR de proveedor](docs/adr/0001-market-data-provider.md) antes de compartir el acceso o el volumen.
 
 ```bash
-python -m pytest -q tests/test_portfolio_refresh.py
+python -m pytest -q tests/test_portfolio_refresh.py tests/test_portfolio_market_refresh.py
 ```

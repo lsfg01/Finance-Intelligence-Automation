@@ -5,6 +5,8 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       DB_PATH: /data/portfolio.sqlite3
+      ENABLE_LIVE_MARKET_DATA: ${ENABLE_LIVE_MARKET_DATA:-0}
+      EODHD_API_TOKEN: ${EODHD_API_TOKEN:-}
     volumes:
       - demo_data:/data
   worker:
