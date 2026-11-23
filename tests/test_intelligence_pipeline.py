@@ -187,7 +187,7 @@ def test_ollama_factory_and_wire_format(monkeypatch):
     assert captured["body"]["stream"] is False and captured["body"]["think"] is False
 
 
-@pytest.mark.parametrize("host", ["https://localhost:11434", "example.com:11434", "localhost.evil:11434",
+@pytest.mark.parametrize("host", ["https://localhost:11434", "example.com:11434", "localhost.evil:11434", "ollama.evil:11434",
                                   "user@localhost:11434", "localhost:11434/path", "localhost:99999"])
 def test_ollama_disallows_nonlocal_or_malformed_hosts(host):
     with pytest.raises(ValueError):
