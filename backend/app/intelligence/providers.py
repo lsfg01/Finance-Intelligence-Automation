@@ -90,7 +90,7 @@ class APIProvider:
 
 @dataclass(frozen=True)
 class OllamaProvider:
-    """Modelo local: no requiere clave y solo permite conexiones loopback."""
+    """Modelo local: loopback o el servicio Ollama de la red de Compose."""
 
     model: str = "qwen3:1.7b"
     host: str = "127.0.0.1:11434"
@@ -102,13 +102,13 @@ class OllamaProvider:
             raise ValueError("Modelo o timeout inválidos")
         try:
             parsed = urlsplit(self.host if "://" in self.host else f"http://{self.host}")
-            if (parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}
+            if (parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1", "ollama"}
                     or parsed.username is not None or parsed.password is not None
                     or parsed.path not in {"", "/"} or parsed.query or parsed.fragment):
-                raise ValueError("Ollama debe usar una dirección local HTTP")
+                raise ValueError("Ollama debe usar loopback o el servicio de Compose")
             _ = parsed.port
         except ValueError:
-            raise ValueError("Ollama debe usar una dirección local HTTP válida") from None
+            raise ValueError("Ollama debe usar loopback o el servicio de Compose mediante HTTP") from None
 
     def generate(self, system: str, data: str, schema: dict) -> str:
         base = self.host if "://" in self.host else f"http://{self.host}"

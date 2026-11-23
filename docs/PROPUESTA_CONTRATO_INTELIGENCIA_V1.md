@@ -1,6 +1,6 @@
 # Propuesta de contrato de inteligencia v1.1
 
-Estado: propuesta para revisión conjunta. No modifica la base de datos, endpoints ni informes existentes. La integración con el worker y la persistencia requiere una PR coordinada.
+Estado: propuesta para revisión conjunta. El worker guarda el sobre de inteligencia en los nuevos informes, sin modificar el esquema de SQLite ni los informes anteriores.
 
 El formato de intercambio v1.1, su adaptador desde la cartera actual y la propuesta para futuras contribuciones de agentes están descritos en `CONTRATO_DATOS_UNIFICADO.md`.
 

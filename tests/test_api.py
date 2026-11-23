@@ -7,7 +7,7 @@ from app import db
 def test_no_automatic_analysis_and_immutable_report(tmp_path):
     path = str(tmp_path / "state.sqlite3")
     with TestClient(create_app(path)) as client:
-        assert client.get("/api/health").json()["model_calls"] == 0
+        assert client.get("/api/health").json()["model_calls"] is None  # El contador aún no está implementado.
         assert "SIMULACIÓN" in client.get("/").text
         assert client.get("/api/reports").json() == []
         first_portfolio = client.get("/api/portfolio").json()

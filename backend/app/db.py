@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from .fixtures import DEMO_PORTFOLIO, DEMO_PROFILE, DEMO_DOCUMENT
 from .models import Portfolio, Profile, SourceDocument
-from .analysis import build_report
+from .orchestration import build_analysis
+from .intelligence.providers import ProviderError
 
 
 def utcnow() -> str:
@@ -144,7 +145,7 @@ def get_report(path: str, report_id: str) -> dict | None:
             }, "result": json.loads(row["payload_json"])}
 
 
-def process_one(path: str) -> str | None:
+def process_one(path: str, pipeline=None) -> str | None:
     """Reclama un trabajo bajo bloqueo y guarda un informe inmutable. Un worker de demo."""
     with connect(path) as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -163,9 +164,12 @@ def process_one(path: str) -> str | None:
         portfolio_json = p_row["payload_json"]
         profile_json = f_row["payload_json"]
         docs_json = row["documents_json"]
-        report = build_report(Portfolio.model_validate_json(portfolio_json),
-                              Profile.model_validate_json(profile_json),
-                              [SourceDocument.model_validate(d) for d in json.loads(docs_json)])
+        report = build_analysis(
+            run_id=run_id, portfolio_version=row["portfolio_version"], profile_version=row["profile_version"],
+            created_at=row["created_at"], portfolio=Portfolio.model_validate_json(portfolio_json),
+            profile=Profile.model_validate_json(profile_json),
+            documents=[SourceDocument.model_validate(d) for d in json.loads(docs_json)], pipeline=pipeline,
+        )
         report_id = str(uuid.uuid4())
         with connect(path) as conn:
             conn.execute("""INSERT INTO reports(id,created_at,portfolio_version,profile_version,
@@ -176,7 +180,8 @@ def process_one(path: str) -> str | None:
             conn.execute("UPDATE analysis_runs SET status='completed',report_id=?,updated_at=? WHERE id=?",
                          (report_id, utcnow(), run_id))
     except Exception as exc:
+        error = str(exc)[:1000] if isinstance(exc, ProviderError) else "No se pudo completar el análisis; revisa la configuración y el snapshot."
         with connect(path) as conn:
             conn.execute("UPDATE analysis_runs SET status='failed',error=?,updated_at=? WHERE id=?",
-                         (str(exc)[:1000], utcnow(), run_id))
+                         (error, utcnow(), run_id))
     return run_id
