@@ -121,17 +121,29 @@ async function loadValuation(refreshPrices){
 }
 priceButton.addEventListener('click',()=>loadValuation(true));
 loadValuation(false);
+
+function intelligenceSection(envelope){
+ if(!envelope) return '<h3>Inteligencia</h3><p class="muted">Este informe anterior no incluye inteligencia.</p>';
+ const x=envelope.result;
+ const findings=x.findings.map(f=>`<li>${esc(f.statement)} <span class="small muted">(${esc(f.category)}; ${f.evidence.map(e=>esc(e.document_id)).join(', ')})</span></li>`).join('');
+ const positions=x.proposed_positions.map(p=>`<li>${esc(p.instrument_id)}: ${esc(p.action)} — ${esc(p.rationale)}</li>`).join('');
+ return `<h3>Inteligencia experimental</h3><p><span class="pill">${esc(x.decision)}</span> <span class="small muted">${esc(x.implementation)}${x.model ? ' · '+esc(x.model) : ''}</span></p>
+ <p class="small muted">Salida ficticia para revisión; no es una orden ni una cartera objetivo.</p>
+ <p><strong>Hallazgos</strong></p><ul>${findings || '<li>Sin hallazgos.</li>'}</ul>
+ <p><strong>Posiciones para revisar</strong></p><ul>${positions || '<li>Ninguna.</li>'}</ul>
+ <p><strong>Datos que faltan y avisos</strong></p><ul>${[...x.missing_data,...x.warnings].map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`;
+}
 async function showReport(id){
  const r=await api('/api/reports/'+encodeURIComponent(id));const d=r.result;
  const b=document.getElementById('report-version');b.hidden=false;b.textContent=`Cartera v${r.portfolio_version} · Perfil v${r.profile_version} · ${d.data_classification}`;
- document.getElementById('report').innerHTML=`<p><span class="pill">${esc(d.proposal)}</span> <strong>${esc(d.rationale)}</strong></p>
+ document.getElementById('report').innerHTML=`<h3>Resultado determinista</h3><p><span class="pill">${esc(d.proposal)}</span> <strong>${esc(d.rationale)}</strong></p>
  <h3>Exposición identificada</h3>${d.exposures.map(e=>`<p><strong>${esc(e.issuer_id)}</strong>: ${fmt(e.known_total_eur)} EUR (${esc(e.known_share_pct ?? '?')} % de la cartera)<br><span class="small muted">Directa: ${fmt(e.direct_eur)} · Indirecta: ${fmt(e.indirect_eur)}</span></p>
  <ul>${e.matches.map(m=>`<li>${esc(m.kind)} · ${esc(m.position_id)} · ${fmt(m.value_eur)} EUR · ${esc(m.trace)}</li>`).join('')}</ul>
  ${e.coverage_warnings.map(c=>`<p class="small muted">⚠️ ${esc(c.position_id)}: composición no observada ${esc(c.uncovered_weight_pct)} %</p>`).join('')}
  <p class="small muted">${esc(e.coverage_note)}</p>`).join('')}
  <h3>Evidencia</h3><ul>${d.evidence.map(ev=>`<li><strong>${esc(ev.document_id)}</strong>: ${esc(ev.title)}<div class="small muted">${esc(ev.source_name)} · ${esc(ev.source_kind)} · publicado ${esc(ev.published_at)}</div></li>`).join('')}</ul>
  <h3>Limitaciones y argumentos</h3><ul>${[...d.arguments_against,...d.risks,...d.missing_data,...d.warnings].map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
- <p class="small muted">Informe congelado; los cambios posteriores de cartera/perfil no lo modificarán.</p>`;
+ ${intelligenceSection(d.intelligence)}<p class="small muted">Informe congelado; los cambios posteriores de cartera/perfil no lo modificarán.</p>`;
 }
 const btn=document.getElementById('run');const status=document.getElementById('status');
 btn.addEventListener('click',async()=>{

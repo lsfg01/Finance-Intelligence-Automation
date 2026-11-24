@@ -2,7 +2,7 @@ services:
   api:
     build: .
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     environment:
       DB_PATH: /data/portfolio.sqlite3
       ENABLE_LIVE_MARKET_DATA: ${ENABLE_LIVE_MARKET_DATA:-0}
@@ -14,7 +14,16 @@ services:
     command: ["python", "-m", "app.worker"]
     environment:
       DB_PATH: /data/portfolio.sqlite3
+      INTELLIGENCE_PROVIDER: ${INTELLIGENCE_PROVIDER:-mock}
+      INTELLIGENCE_MODEL: ${INTELLIGENCE_MODEL:-qwen3:1.7b}
+      OLLAMA_HOST: ollama:11434
     volumes:
       - demo_data:/data
+  ollama:
+    image: ollama/ollama:0.40.14
+    profiles: ["intelligence"]
+    volumes:
+      - ollama_models:/root/.ollama
 volumes:
   demo_data:
+  ollama_models:

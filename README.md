@@ -1,6 +1,6 @@
 # Análisis de inversiones — incremento 0.1
 
-**Demo local con tenencias y noticias ficticias.** Funciona offline por defecto. El modo de mercado opcional consulta precios diarios de EODHD y tipos de cambio de referencia del BCE bajo demanda.
+**Demo local con tenencias y noticias ficticias.** Funciona offline por defecto con precios e inteligencia simulados. El refresco de mercado opcional consulta EODHD y el BCE bajo demanda. El worker puede usar un modelo local con Ollama.
 
 Consulta el [acta de cierre de I1](docs/CIERRE_I1_CARTERA_Y_PRECIOS.md) para el alcance de la entrega y las comprobaciones realizadas.
 
@@ -44,7 +44,9 @@ pytest -q
 
 ## Limitaciones deliberadas de este incremento
 
-No hay todavía importador CSV, motor LLM, chat, autorización de usuarios, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración: antes de servir múltiples usuarios se necesita una infraestructura transaccional adecuada, control de acceso, migraciones y auditoría ampliada. La interfaz demuestra la lectura, no la edición del perfil/cartera, aunque la API de I0 permite nuevas versiones.
+No hay todavía importador CSV, chat, autorización de usuarios, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración. La API de I0 permite crear versiones de la cartera y del perfil. Los informes son para revisión humana.
+
+El worker incorpora el resultado de inteligencia al informe, en `result.intelligence`, sin alterar las exposiciones deterministas. Por defecto utiliza el mock; el modelo local Ollama es opcional y solo acepta datos de demostración. Véanse [uso de inteligencia](docs/USO_INTELIGENCIA.md) y [contrato propuesto](docs/CONTRATO_DATOS_UNIFICADO.md).
 
 **No exponer esta demo directamente a Internet:** los endpoints de escritura no tienen autenticación.
 
@@ -102,7 +104,7 @@ python -m pytest -q tests/test_portfolio_valuation.py
 
 Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio`, la última `valuation` del mismo identificador, versión y snapshot, y su `valuation_mode` (`simulated` o `live`). Si todavía no hay una valoración guardada, la pantalla muestra los precios pendientes. Cada refresco correcto devuelve HTTP 201 y crea un snapshot propio. La demo simulada muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
 
-La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa la cartera versionada del prototipo y sigue siendo una acción independiente. Los informes guardados conservan el snapshot con el que se crearon.
+La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa el snapshot de I0 fijado al encolar y añade el resultado de inteligencia al informe. La conexión con la cartera multiactivo queda pendiente de coordinación mediante [`PortfolioAnalysisView v1`](docs/CONTRATO_CARTERA_ANALISIS_V1.md).
 
 ### Datos de mercado
 

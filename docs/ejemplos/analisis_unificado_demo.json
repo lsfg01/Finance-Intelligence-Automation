@@ -1,0 +1,166 @@
+{
+  "contract_version": "1.1",
+  "context": {
+    "contract_version": "1.1",
+    "run_id": "demo-unificado-001",
+    "portfolio_version": 1,
+    "profile_version": 1,
+    "as_of": "2026-11-21T00:00:00Z",
+    "data_classification": "SIMULATED",
+    "portfolio": {
+      "name": "Cartera ficticia de validacion",
+      "base_currency": "EUR",
+      "positions": [
+        {
+          "position_id": "P1",
+          "instrument_id": "DEMO:CHIP",
+          "name": "DemoChip S.A. (FICTICIA)",
+          "kind": "stock",
+          "quantity": "30",
+          "unit_price": "100",
+          "quote_currency": "EUR",
+          "price_at": "2026-11-18T18:00:00Z",
+          "price_source": "fixture:inventado",
+          "holdings": [],
+          "composition_as_of": null,
+          "composition_source": null
+        },
+        {
+          "position_id": "P2",
+          "instrument_id": "DEMO:ETFTECH",
+          "name": "ETF Demo Innovacion (FICTICIO)",
+          "kind": "etf",
+          "quantity": "20",
+          "unit_price": "150",
+          "quote_currency": "EUR",
+          "price_at": "2026-11-18T18:00:00Z",
+          "price_source": "fixture:inventado",
+          "holdings": [
+            {
+              "issuer_id": "DEMO:CHIP",
+              "weight": "0.20"
+            },
+            {
+              "issuer_id": "DEMO:OTHER",
+              "weight": "0.30"
+            }
+          ],
+          "composition_as_of": "2026-11-17T00:00:00Z",
+          "composition_source": "fixture:inventado"
+        },
+        {
+          "position_id": "P3",
+          "instrument_id": "DEMO:OTHER",
+          "name": "DemoOther S.A. (FICTICIA)",
+          "kind": "stock",
+          "quantity": "10",
+          "unit_price": "100",
+          "quote_currency": "EUR",
+          "price_at": "2026-11-18T18:00:00Z",
+          "price_source": "fixture:inventado",
+          "holdings": [],
+          "composition_as_of": null,
+          "composition_source": null
+        }
+      ]
+    },
+    "profile": {
+      "name": "Perfil demostrativo",
+      "horizon": "largo plazo (10 años)",
+      "risk_tolerance": "medium",
+      "constraints": [
+        "Sin operaciones automaticas"
+      ],
+      "notes": "Ejemplo sintetico para pruebas, no es asesoramiento financiero"
+    },
+    "documents": [
+      {
+        "document_id": "DOC-DEMO-001",
+        "title": "Escenario inventado: nueva regulacion de semiconductores",
+        "summary": "Documento ficticio para verificar el enlace entre una empresa y un ETF que la incluye.",
+        "source_name": "Fuente ficticia de pruebas",
+        "source_kind": "demo_fixture",
+        "url": null,
+        "published_at": "2026-11-18T10:00:00Z",
+        "event_at": "2026-11-18T09:00:00Z",
+        "retrieved_at": "2026-11-20T09:00:00Z",
+        "issuer_ids": [
+          "DEMO:CHIP"
+        ]
+      }
+    ],
+    "exposures": [
+      {
+        "issuer_id": "DEMO:CHIP",
+        "currency": "EUR",
+        "portfolio_value": "7000.00",
+        "direct": "3000.00",
+        "indirect": "600.00",
+        "known_total": "3600.00",
+        "known_share_pct": "51.43",
+        "matches": [
+          {
+            "position_id": "P1",
+            "kind": "direct",
+            "value_eur": "3000.00",
+            "weight_pct": null,
+            "trace": "P1: instrumento DEMO:CHIP"
+          },
+          {
+            "position_id": "P2",
+            "kind": "indirect",
+            "value_eur": "600.00",
+            "weight_pct": "20.00",
+            "trace": "P2: 0.20 de DEMO:CHIP; composicion fixture:inventado"
+          }
+        ],
+        "coverage_warnings": [
+          {
+            "position_id": "P2",
+            "uncovered_weight_pct": "50.00",
+            "composition_as_of": "2026-11-17T00:00:00Z"
+          }
+        ],
+        "coverage_note": "Exposicion identificada, no limite superior: la parte sin desglosar podria contener mas exposicion."
+      }
+    ]
+  },
+  "result": {
+    "contract_version": "1.1",
+    "run_id": "demo-unificado-001",
+    "portfolio_version": 1,
+    "profile_version": 1,
+    "as_of": "2026-11-21T00:00:00Z",
+    "data_classification": "SIMULATED",
+    "decision": "REVISAR",
+    "findings": [
+      {
+        "statement": "Documento ficticio para verificar el enlace entre una empresa y un ETF que la incluye.",
+        "category": "source_claim",
+        "issuer_candidates": [
+          "DEMO:CHIP"
+        ],
+        "evidence": [
+          {
+            "document_id": "DOC-DEMO-001",
+            "source_field": "summary",
+            "excerpt": "Documento ficticio para verificar el enlace entre una empresa y un ETF que la incluye."
+          }
+        ]
+      }
+    ],
+    "arguments_for": [],
+    "arguments_against": [],
+    "proposed_positions": [],
+    "missing_data": [
+      "Las etiquetas de emisor son candidatos sin resolver; no se han validado fuentes externas."
+    ],
+    "warnings": [
+      "Solo procesamiento determinista de los datos suministrados."
+    ],
+    "implementation": "mock",
+    "model": null,
+    "prompt_version": null
+  },
+  "contributions": []
+}

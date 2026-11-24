@@ -32,7 +32,7 @@ def create_app(database_path: str | None = None) -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "mode": "offline_demo", "model_calls": 0}
+        return {"status": "ok", "mode": "demo", "model_calls": None}
 
     @app.get("/api/portfolio")
     def get_portfolio():
