@@ -61,7 +61,8 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
             assert connection.execute("SELECT COUNT(*) FROM multiactive_portfolios").fetchone() == (1,)
 
 
-def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
+def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path, monkeypatch):
+    monkeypatch.setenv("INTELLIGENCE_PROVIDER", "mock")
     path = tmp_path / "demo.sqlite3"
     db.init_db(str(path))
     legacy = db.latest_version(str(path), "portfolio_versions")
@@ -71,6 +72,9 @@ def test_refresh_preserves_holdings_previous_valuation_and_report(tmp_path):
     assert db.process_one(str(path)) == run["id"]
     report_id = db.get_run(str(path), run["id"])["report_id"]
     original_report = db.get_report(str(path), report_id)
+    envelope = original_report["result"]["intelligence"]
+    assert envelope["result"]["implementation"] == "mock"
+    assert envelope["context"]["portfolio"]["name"] == "Cartera editada"
     with TestClient(create_app(str(path))) as client:
         original_portfolio = client.get("/api/portfolio").json()
         assert original_portfolio["data"]["name"] == "Cartera editada"
