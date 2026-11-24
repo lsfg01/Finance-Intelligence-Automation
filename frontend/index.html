@@ -14,30 +14,114 @@
     .muted{color:#667b8c}.small{font-size:.82rem} button{background:#215caa;color:white;padding:12px 16px;border:0;border-radius:9px;font-weight:650;cursor:pointer}
     button:disabled{background:#879bad;cursor:default}.stat{font-size:1.6rem;font-weight:720;margin:7px 0} .pair{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     code{background:#eef2f6;padding:2px 4px;border-radius:3px;word-break:break-all} ul{padding-left:20px} li{margin:7px 0}
+    .table-scroll{overflow-x:auto}
     @media(max-width:750px){.cards{grid-template-columns:1fr}header{padding:22px}}
   </style>
 </head>
 <body>
 <header><h1>Laboratorio de análisis de inversiones</h1><div class="sub">Primer incremento · Cartera versionada · Exposición trazable · Análisis bajo demanda</div></header>
 <main>
-  <div class="alert"><strong>SIMULACIÓN — Sin datos reales.</strong> Precios, instrumentos y noticias inventados exclusivamente para probar la ingeniería. No se trata de asesoramiento financiero.</div>
+  <div class="alert"><strong>SIMULACIÓN.</strong> Las posiciones y noticias son ficticias. La tabla identifica el origen y la fecha de cada precio.</div>
+  <section class="card" aria-labelledby="valuation-title">
+    <div class="pair">
+      <h2 id="valuation-title">Cartera</h2>
+      <button id="refresh-prices">Actualizar precios</button>
+    </div>
+    <p id="versions" class="muted"></p>
+    <p id="valuation-status" class="muted" role="status">Cargando cartera…</p>
+    <p id="refresh-status" class="muted" role="status" hidden></p>
+    <div id="valuation" class="table-scroll"></div>
+  </section>
   <div class="cards">
-    <section class="card"><h2>Cartera</h2><p id="versions" class="muted">Cargando...</p><div id="positions"></div></section>
-    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div><hr style="border:0;border-top:1px solid #e5ebf0;margin:20px 0"><h2>Ejecutar análisis</h2><p class="small muted">Solo se genera al pulsar el botón. Worker independiente.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
+    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div></section>
+    <section class="card"><h2>Ejecutar análisis</h2><p class="small muted">Análisis de la cartera histórica I0, bajo demanda.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
   </div>
   <section class="card"><div class="pair"><h2>Informe</h2><span id="report-version" class="pill" hidden></span></div><div id="report"><p class="muted">Aún no hay informe seleccionado. Ejecuta un análisis.</p></div></section>
 </main>
 <script>
 const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
-async function api(url, options){const response=await fetch(url,options); if(!response.ok){throw new Error((await response.text()).slice(0,250))}return response.json();}
+async function api(url, options){
+ const response = await fetch(url, options);
+ if(response.ok) return response.json();
+ const data = await response.json().catch(()=>null);
+ throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${response.status}`);
+}
 async function refresh(){
- const [portfolio,profile,reports] = await Promise.all([api('/api/portfolio'),api('/api/profile'),api('/api/reports')]);
- document.getElementById('versions').textContent = `Versión ${portfolio.version} · Moneda ${portfolio.data.base_currency}`;
- document.getElementById('positions').innerHTML='<table><thead><tr><th>Instrumento</th><th>Valor EUR</th><th>Fecha</th></tr></thead><tbody>'+portfolio.data.positions.map(p=>`<tr><td>${esc(p.name)}<div class="muted small">${esc(p.kind)} · ${esc(p.instrument_id)}</div></td><td>${fmt(Number(p.quantity)*Number(p.unit_price))}</td><td>${esc(p.price_at.slice(0,10))}<div class="muted small">${esc(p.price_source)}</div></td></tr>`).join('')+'</tbody></table>';
+ const [profile,reports] = await Promise.all([api('/api/profile'),api('/api/reports')]);
  document.getElementById('profile').innerHTML=`<p><strong>${esc(profile.data.name)}</strong> · versión ${profile.version}</p><p>Horizonte: ${esc(profile.data.horizon)}</p><p>Riesgo: ${esc(profile.data.risk_tolerance)}</p><p class="muted small">${profile.data.constraints.map(esc).join(' · ')}</p>`;
  if(reports.length){await showReport(reports[0].id)}
 }
 function esc(x){return String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const priceButton = document.getElementById('refresh-prices');
+const refreshStatus = document.getElementById('refresh-status');
+const valuationStatus = document.getElementById('valuation-status');
+const valuationElement = document.getElementById('valuation');
+const valuationStates = {COMPLETE:'Completa',PARTIAL:'Parcial',MISSING:'Sin posiciones valoradas'};
+const priceTypes = {NAV:'Valor liquidativo',EOD_CLOSE:'Cierre diario',LAST:'Última cotización',INDICATIVE:'Precio indicativo'};
+const valuationIssues = {
+ UNKNOWN_INSTRUMENT:'Instrumento desconocido',UNSUPPORTED_ASSET:'Activo sin método de valoración',
+ AMBIGUOUS_LISTING:'Plaza ambigua',MISSING_LISTING:'Falta la plaza',INVALID_LISTING:'Plaza inválida',
+ MISSING_PRICE:'Sin precio disponible',STALE_PRICE:'Precio desactualizado',
+ PRICE_CURRENCY_MISMATCH:'La moneda del precio no coincide',AMBIGUOUS_PRICE:'Precio ambiguo',
+ MISSING_FX:'Sin tipo de cambio para la fecha del precio',AMBIGUOUS_FX:'Tipo de cambio ambiguo'
+};
+const valuationAmount = (value, currency) => value === null ? '—' : `${fmt(value)} ${esc(currency)}`;
+function renderValuation({portfolio, valuation, valuation_mode, instruments, listings}){
+ document.getElementById('versions').textContent = `Demo multiactivo · Versión ${portfolio.version} · Moneda ${portfolio.base_currency}`;
+ valuationStatus.textContent = valuation
+  ? `Precios ${valuation_mode === 'live' ? 'de mercado' : 'simulados'} · Fecha de valoración ${valuation.as_of} · ${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas`
+  : 'Precios pendientes. Aún no hay una valoración guardada.';
+ const instrumentById = new Map(instruments.map(item=>[item.instrument_id,item]));
+ const listingById = new Map(listings.map(item=>[item.listing_id,item]));
+ const priceById = new Map((valuation?.price_observations ?? []).map(item=>[item.observation_id,item]));
+ const fxById = new Map((valuation?.fx_observations ?? []).map(item=>[item.observation_id,item]));
+ const valueByPosition = new Map((valuation?.positions ?? []).map(row=>[row.position.position_id,row]));
+ const rows = portfolio.positions.map(position=>{
+  const row = valueByPosition.get(position.position_id);
+  const instrument = instrumentById.get(position.instrument_id);
+  const listing = listingById.get(position.listing_id);
+  const price = priceById.get(row?.price_observation_id);
+  const fx = fxById.get(row?.fx_observation_id);
+  return `<tr><td><strong>${esc(instrument?.name ?? position.instrument_id)}</strong>
+   <div class="muted small">${esc(listing ? listing.ticker+' · '+listing.mic : instrument?.isin ?? position.instrument_id)}</div></td>
+   <td>${esc(position.quantity)}</td>
+   <td>${price ? `${esc(price.value.replace('.', ','))} ${esc(price.currency)}` : '—'}</td>
+   <td>${valuationAmount(row?.quote_value ?? null,row?.quote_currency)}</td>
+   <td>${valuationAmount(row?.base_value ?? null,portfolio.base_currency)}</td>
+   <td>${price ? `${esc(priceTypes[price.price_type] ?? price.price_type)} · ${esc(price.price_as_of)}
+    <div class="muted small">${price.is_simulated ? 'Simulado' : 'Mercado'} · ${esc(price.provider)}<br>${esc(price.source)}</div>` : '—'}
+    ${fx ? `<div class="muted small">FX · ${esc(fx.provider)} · ${esc(fx.as_of)}<br>${esc(fx.source)}</div>` : ''}</td>
+   <td>${esc(row ? (row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada') : 'Pendiente')}</td></tr>`;
+ }).join('');
+ const summary = valuation ? `<div class="pair">
+  <p><strong>Valor conocido</strong> ${valuationAmount(valuation.known_value,valuation.base_currency)}</p>
+  <p><strong>Total de cartera</strong> ${valuation.total_value === null ? 'Indeterminado' : valuationAmount(valuation.total_value,valuation.base_currency)}</p></div>` : '';
+ valuationElement.innerHTML = `${summary}
+  <table aria-label="Posiciones de la cartera multiactivo"><thead><tr>
+  <th>Instrumento</th><th>Cantidad</th><th>Precio</th><th>Valor de posición</th>
+  <th>Valor en moneda base</th><th>Fecha y fuente</th><th>Estado</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function loadValuation(refreshPrices){
+ priceButton.disabled = true;
+ if(refreshPrices){
+  refreshStatus.hidden = false;
+  refreshStatus.textContent = 'Actualizando precios…';
+ }
+ try{
+  const url = refreshPrices ? '/api/portfolio/refresh-prices' : '/api/portfolio/valuation';
+  renderValuation(await api(url, refreshPrices ? {method:'POST'} : undefined));
+  refreshStatus.hidden = true;
+ }catch(error){
+  const target = refreshPrices ? refreshStatus : valuationStatus;
+  target.textContent = (refreshPrices ? 'No se pudieron actualizar los precios. ' : 'No se pudo cargar la cartera. ')+error.message;
+ }finally{
+  priceButton.disabled = false;
+ }
+}
+priceButton.addEventListener('click',()=>loadValuation(true));
+loadValuation(false);
+
 function intelligenceSection(envelope){
  if(!envelope) return '<h3>Inteligencia</h3><p class="muted">Este informe anterior no incluye inteligencia.</p>';
  const x=envelope.result;

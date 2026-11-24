@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from . import db
 from .models import Portfolio, Profile
+from .portfolio.routes import valuation_router
 
 def frontend_path() -> Path:
     """Use an explicit path in a container; retain local editable-install support."""
@@ -23,6 +24,7 @@ def create_app(database_path: str | None = None) -> FastAPI:
         yield
 
     app = FastAPI(title="Analisis de inversiones - demo", version="0.1.0", lifespan=lifespan)
+    app.include_router(valuation_router(Path(path)))
 
     @app.get("/")
     def home():
