@@ -12,7 +12,7 @@
 
 Los importes, cantidades, tasas y pesos fraccionarios se intercambian como cadenas decimales. Las fechas de NAV pueden conservarse sin hora. `valuation.total_value` es `null` con cobertura parcial o ausente. Un cambio incompatible en la forma o el significado del mensaje requiere una versión nueva.
 
-El [ejemplo JSON completo](../tests/fixtures/portfolio_analysis_v1.json) fija tres posiciones simuladas, una valoración parcial, una observación FX para la posición de Londres y composiciones de cobertura parcial y desconocida. Se puede consumir sin arrancar FastAPI, abrir SQLite ni consultar proveedores.
+El [ejemplo JSON completo](../../tests/fixtures/portfolio_analysis_v1.json) fija tres posiciones simuladas, una valoración parcial, una observación FX para la posición de Londres y composiciones de cobertura parcial y desconocida. Se puede consumir sin arrancar FastAPI, abrir SQLite ni consultar proveedores.
 
 ```python
 from pathlib import Path
@@ -23,4 +23,4 @@ view = PortfolioAnalysisView.model_validate_json(
 )
 ```
 
-La aplicación puede continuar preparando su `AnalysisContext` por separado. El worker de la demo conserva su flujo actual de análisis bajo demanda.
+El worker todavía prepara el [contexto de inteligencia](../inteligencia/CONTRATO_DATOS_UNIFICADO.md) con I0. Al conectar I1, el adaptador debe conservar el total indeterminado cuando la cobertura sea parcial y comprobar que cada referencia de precio o FX exista en las observaciones del snapshot. Hoy el lector de la vista puede aceptar una referencia ausente.

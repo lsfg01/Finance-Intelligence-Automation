@@ -1,8 +1,8 @@
 # Propuesta de contrato de inteligencia v1.1
 
-Estado: propuesta para revisión conjunta. El worker guarda el sobre de inteligencia en los nuevos informes, sin modificar el esquema de SQLite ni los informes anteriores.
+Antecedente de diseño archivado al integrarse I1. El worker guarda el sobre de inteligencia en los nuevos informes, sin modificar el esquema de SQLite ni los informes anteriores.
 
-El formato de intercambio v1.1, su adaptador desde la cartera actual y la propuesta para futuras contribuciones de agentes están descritos en `CONTRATO_DATOS_UNIFICADO.md`.
+El formato de intercambio v1.1, su adaptador desde la cartera actual y la propuesta para futuras contribuciones de agentes se describen en el [contrato implementado](../../inteligencia/CONTRATO_DATOS_UNIFICADO.md).
 
 ## Responsabilidad y uso
 

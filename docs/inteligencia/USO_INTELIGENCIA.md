@@ -1,6 +1,6 @@
 # Módulo de inteligencia: demo y contrato
 
-El worker utiliza este módulo para cada trabajo solicitado y guarda `AnalysisEnvelope` en `result.intelligence` del informe inmutable. Por defecto usa el mock; el proveedor se selecciona en el entorno del worker. Sus implementaciones devuelven `IntelligenceResult` v1.1 descrito en `PROPUESTA_CONTRATO_INTELIGENCIA_V1.md`; el contrato sigue pendiente de acuerdo con el equipo.
+El worker utiliza este módulo para cada trabajo solicitado y guarda `AnalysisEnvelope` en `result.intelligence` del informe inmutable. Por defecto usa el mock; el proveedor se selecciona en el entorno del worker. Sus implementaciones devuelven `IntelligenceResult` según el [contrato v1.1](CONTRATO_DATOS_UNIFICADO.md).
 
 ## Docker con modelo local
 
@@ -16,7 +16,7 @@ Después abrir http://127.0.0.1:8000 y pulsar **Analizar cartera**. La primera d
 
 El servicio Ollama solo se añade con el perfil `intelligence`, se conecta mediante la red de Compose y no publica un puerto en el equipo. Su volumen conserva el modelo. La integración es experimental y el contrato no es una propuesta de pesos ni una orden de inversión.
 
-Para el formato de intercambio con cartera y los roles futuros, consultar `CONTRATO_DATOS_UNIFICADO.md` y el JSON de `ejemplos/analisis_unificado_demo.json`.
+El [ejemplo JSON](../ejemplos/analisis_unificado_demo.json) muestra el intercambio de datos con la cartera histórica.
 
 ## Ejecución local sin conexión
 
@@ -52,7 +52,7 @@ python -m app.intelligence.demo --envelope
 
 La prueba se efectuó con una instalación portátil en el puerto **11435**. Para reutilizar esa instancia mientras siga activa, configurar `$env:OLLAMA_HOST = "127.0.0.1:11435"`. El modelo ocupa aproximadamente 1,4 GB y la primera carga puede tardar; la inferencia local no requiere clave ni pago por petición. El adaptador permite HTTP sobre loopback o el nombre `ollama` de la red de Compose. Descargar el software y modelo sí requiere Internet.
 
-La ejecución real quedó guardada en `ejemplos/resultado_ollama_real.json`: `implementation=llm:ollama`, `model=qwen3:1.7b`, decisión `ABSTENERSE` y ninguna posición propuesta por falta de información. Los datos de entrada son ficticios; el modelo es real. Una respuesta anterior inventó un emisor candidato, por lo que se añadió una regla que rechaza candidatos no validados; la ejecución guardada pasó la validación. La prueba muestra que funciona la llamada y el contrato, no demuestra la calidad financiera del modelo ni genera una cartera objetivo. Se trata de una única llamada a un modelo, no de una integración multiagente autónoma.
+El [resultado de la ejecución local con Ollama](../ejemplos/resultado_ollama_real.json) registra `implementation=llm:ollama`, `model=qwen3:1.7b`, decisión `ABSTENERSE` y ninguna posición propuesta por falta de información. Los datos de entrada son ficticios; el modelo es real. Una respuesta anterior inventó un emisor candidato, por lo que se añadió una regla que rechaza candidatos no validados; la ejecución guardada pasó la validación. La prueba muestra que funciona la llamada y el contrato, no demuestra la calidad financiera del modelo ni genera una cartera objetivo. Se trata de una única llamada a un modelo, no de una integración multiagente autónoma.
 
 ## Llamada opcional a un proveedor externo
 
@@ -99,4 +99,4 @@ El contexto, snapshot y cálculo los prepara la aplicación; `intelligence` no a
 
 `python -m pytest -q` cubre la interfaz, la integración del worker, validación de evidencia y formatos HTTP mediante respuestas simuladas. Los tests automáticos no acreditan que una clave, modelo, plan o proveedor externo funcionen. La ejecución real con Ollama se verifica por separado.
 
-La prueba `tests/test_intelligence_http_e2e.py` toma un informe de la API de cartera existente y llama al módulo de inteligencia a través de un servidor HTTP local que imita a xAI o Groq. El JSON generado en una ejecución de esta prueba está en `ejemplos/resultado_api_simulada.json`: es completamente ficticio y su propuesta fue escrita por el servidor de prueba, no por un LLM. Ejecutar la prueba con `python -m pytest -q tests/test_intelligence_http_e2e.py`. La prueba usa `db.process_one()` de la demo; todavía no integra inteligencia en el worker ni en la tabla de informes del proyecto.
+La prueba `tests/test_intelligence_http_e2e.py` toma un informe de la API de cartera existente y llama al módulo de inteligencia a través de un servidor HTTP local que imita a xAI o Groq. El [resultado de ejemplo](../ejemplos/resultado_api_simulada.json) contiene la propuesta ficticia escrita por el servidor de prueba. Ejecutar la prueba con `python -m pytest -q tests/test_intelligence_http_e2e.py`. La [prueba del worker](../../tests/test_worker_intelligence.py) verifica por separado el guardado del resultado y la recuperación de informes anteriores.

@@ -1,6 +1,10 @@
 # Decisiones por acordar con el equipo
 
-> Estado: preguntas abiertas. Recomendación de partida reversible entre paréntesis.
+Al cierre de I1 siguen pendientes las condiciones de uso de EODHD por el equipo y la adopción de la cartera multiactivo por inteligencia. La decisión de proveedor cuenta con una [ADR](../adr/0001-market-data-provider.md). Las tareas propuestas están en la [guía de entrada](../../AGENTS.md).
+
+## Preguntas de planificación inicial
+
+La tabla conserva las opciones consideradas al arrancar el proyecto. En la primera fila, la integración se refiere a las fuentes de noticias.
 
 | Prioridad | Decisión | Recomendación provisional | Impacto |
 |---|---|---|---|
@@ -23,4 +27,4 @@
 4. ¿Cuántas personas desarrollarán, con qué experiencia y horas semanales, y con qué presupuesto total mensual para servicios?
 5. ¿Queréis propuestas cualitativas de revisar/mantener/aumentar/reducir o también pesos objetivo? (No recomiendo pesos objetivo en la v1.)
 
-Las preguntas que no bloqueen la siguiente iteración pueden aplazarse sin detener I1.
+El [acta de I1](../historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md) recoge qué decisiones y comprobaciones se cerraron después de esta primera reunión.

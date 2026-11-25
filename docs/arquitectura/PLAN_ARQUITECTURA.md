@@ -1,6 +1,6 @@
 # Plan de arquitectura e implementación
 
-Fecha: 20-11-2026. Basado en la especificación inicial de 16-11-2026. Las elecciones de esta página son propuestas técnicas, no acuerdos del equipo.
+Fecha: 20-11-2026. Basado en la especificación inicial de 16-11-2026. Este documento recoge las propuestas técnicas iniciales. La [guía de entrada](../../AGENTS.md) recoge el estado entregado y el trabajo propuesto al cierre de I1.
 
 ## Invariantes del producto
 
@@ -15,7 +15,7 @@ Fecha: 20-11-2026. Basado en la especificación inicial de 16-11-2026. Las elecc
 ## Arquitectura objetivo (MVP)
 
 ```text
-React + TypeScript (dashboard + chat, siguiente incremento)
+React + TypeScript (dashboard + chat, propuesta inicial)
   ↓ HTTPS API con contratos tipados
 FastAPI (cartera, perfiles, fuentes, ejecuciones, informes, chat)
   ↓                                  ↓
@@ -97,7 +97,7 @@ El incremento 0.1 usa rutas `/api/*` simplificadas; migrar a `/v1/*` con OpenAPI
 
 ## Backlog incremental sugerido
 
-La tabla recoge la secuencia prevista inicialmente. La entrega de cartera y datos de mercado se documenta en el [cierre de I1](CIERRE_I1_CARTERA_Y_PRECIOS.md). La importación de posiciones desde CSV queda para un incremento posterior.
+La tabla recoge la secuencia prevista inicialmente. La entrega de cartera y datos de mercado se documenta en el [cierre de I1](../historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md). La importación de posiciones desde CSV queda para un incremento posterior.
 
 | Iteración | Resultado observable | Criterio de salida |
 |---|---|---|
@@ -140,3 +140,28 @@ El primer incremento es offline y no requiere licencias de mercado ni llamadas a
 ## Fuera del alcance de etapa 1
 
 Ejecución de órdenes, recomendaciones cuantitativas de peso objetivo, predicción de rentabilidad, monitorización continua, integraciones mediante credenciales del bróker no documentadas, multiusuario público sin seguridad.
+
+## Trabajo en componentes compartidos
+
+Acuerdos vigentes del equipo para cambios de API, contratos, persistencia y análisis.
+
+| Componente | Responsabilidad |
+|---|---|
+| [Cartera I1](../../backend/app/portfolio/) y [datos de mercado](../../backend/app/market_data/) | Cartera versionada, instrumentos y plazas, observaciones de precios y FX, valoración y cobertura. La identidad del emisor y la del instrumento son distintas. |
+| [Análisis I0](../../backend/app/analysis.py) | Cálculo determinista de exposición directa e indirecta de la cartera histórica. Una composición parcial deja exposición sin identificar. |
+| [Inteligencia](../../backend/app/intelligence/) | Interpretación tipada, evidencia, prompts, proveedores de modelos y pruebas offline. Los candidatos a emisor requieren resolución antes de usarlos como identidades financieras. |
+| [Orquestación](../../backend/app/orchestration.py), [persistencia](../../backend/app/db.py) y [worker](../../backend/app/worker.py) | La aplicación fija las entradas al encolar, invoca el motor y la inteligencia y guarda el informe. El worker sondea la cola. |
+| [API](../../backend/app/main.py), [modelos I0](../../backend/app/models.py) y [frontend](../../frontend/) | Las rutas reciben y validan peticiones. La interfaz presenta las cifras que calcula el backend. |
+
+### Contratos y trabajo en paralelo
+
+El responsable de cada módulo puede avanzar en su rama con sus pruebas y documentos. Toda modificación de `POST /api/analyses`, `analysis_runs`, los modelos compartidos, el informe o los estados del trabajo se acuerda con el responsable del consumidor. Para una integración entre módulos, abrid una PR específica con un responsable y revisión de ambos.
+
+Antes de cambiar el formato, identificad los lectores, mostrad un ejemplo con fechas, unidades y nulos, y conservad los históricos. Preferid adaptadores compatibles. Un cambio incompatible requiere versión, migración cuando proceda y prueba con datos anteriores. Mantened explícita la diferencia entre `completed`/`failed` del trabajo y `REVISAR`/`ABSTENERSE` del análisis.
+
+### Qué comprobar en la PR
+
+- Al tocar el flujo, probad que abrir el dashboard y cambiar la cartera no encolan un análisis. Una edición posterior al encolado debe conservar el informe original.
+- En I0, el fixture `DEMO:CHIP` da 3.000 EUR directos y 600 EUR indirectos. En I1, comprobad la cobertura parcial, la fecha del precio y del FX, la moneda y las referencias usadas. Una composición incompleta no establece un límite superior de exposición.
+- Para inteligencia, comprobad citas, contradicciones, abstención y fallos visibles con fixtures o mocks. Las fuentes conservan procedencia y fechas de publicación, hecho si se conoce y recuperación. Registrad modelo y versión del prompt cuando haya llamada real. Comparad calidad, latencia y coste frente al flujo simple antes de introducir agentes.
+- En la PR anotad alcance, contrato afectado, pruebas, limitaciones y, cuando aplique, coste o dependencia nueva. Si cambia un comportamiento observable, actualizad su guía. La suite completa se ejecuta desde la raíz con `python -m pytest -q`.

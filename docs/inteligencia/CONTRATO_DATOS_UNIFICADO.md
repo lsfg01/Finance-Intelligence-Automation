@@ -1,13 +1,13 @@
-# Datos comunes para cartera e inteligencia — propuesta 1.1
+# Contrato de inteligencia v1.1
 
-Esta propuesta permite que la implementación simple de LLM y los futuros agentes usen las mismas entradas y salidas. Se basa en la demo actual; no sustituye el modelo de cartera que está desarrollando el compañero ni afirma que ya se haya integrado. El acuerdo final y la persistencia en el proyecto compartido corresponden a la PR conjunta.
+El worker consume `AnalysisContext` de la cartera histórica I0 y guarda `AnalysisEnvelope` v1.1 en los nuevos informes. La cartera multiactivo I1 ya expone su [vista de análisis](../cartera/CONTRATO_CARTERA_ANALISIS_V1.md). Su conexión con el worker está pendiente.
 
 ## Archivos para intercambiar
 
-- `ejemplos/analisis_unificado_demo.json`: entrada y salida reales del mock sobre fixtures, sin agentes ni datos reales.
-- `ejemplos/analisis_unificado_v1.1.schema.json`: JSON Schema generado para la **serialización** de `AnalysisEnvelope`. Las reglas entre campos, las referencias y el corte temporal también requieren `AnalysisEnvelope.model_validate_json(...)`: el esquema JSON por sí solo no las implementa todas.
-- `backend/app/intelligence/contracts.py`: definición Pydantic ejecutable.
-- `backend/app/intelligence/adapters.py`: puente desde el cálculo `exposure_for_issuer()` de la demo actual.
+- [Ejemplo de entrada y salida](../ejemplos/analisis_unificado_demo.json) generado por el mock sobre fixtures.
+- [JSON Schema](../ejemplos/analisis_unificado_v1.1.schema.json) generado para la **serialización** de `AnalysisEnvelope`. Las reglas entre campos, las referencias y el corte temporal también requieren `AnalysisEnvelope.model_validate_json(...)`: el esquema JSON por sí solo no las implementa todas.
+- [Definición Pydantic del contrato](../../backend/app/intelligence/contracts.py).
+- [Adaptador de I0](../../backend/app/intelligence/adapters.py) desde el cálculo `exposure_for_issuer()`.
 
 ## Formato externo
 
@@ -65,11 +65,11 @@ envelope = AnalysisEnvelope(context=context, result=result)
 payload_json = envelope.model_dump_json()
 ```
 
-Para leerlo: `AnalysisEnvelope.model_validate_json(payload_json)`. La aplicación es quien podría guardar el JSON y gestionar transacciones y estados; la clase no lee ni escribe la BD. La prueba `test_intelligence_unified.py` demuestra un intercambio aislado en SQLite en memoria, no la integración con la tabla `reports` existente.
+Para leer el JSON usa `AnalysisEnvelope.model_validate_json(payload_json)`. La aplicación gestiona transacciones y almacena el resultado en el informe. Las pruebas cubren el [intercambio del contrato](../../tests/test_intelligence_unified.py) y su [persistencia por el worker](../../tests/test_worker_intelligence.py).
 
 ## Versionado y límites
 
 - Esta revisión se identifica como **1.1**. El paquete anterior era una propuesta 1.0 con lectores que rechazan campos nuevos: no asumir compatibilidad silenciosa. Se aceptan contextos/resultados marcados `1.0` por separado para facilitar una transición; el `AnalysisEnvelope` exige `1.1`. La actualización y validación del nuevo contrato deben ser explícitas.
-- `context_from_current_snapshot` acepta exactamente el diccionario actual de `exposure_for_issuer` y los modelos existentes. Si la nueva cartera cambia sus campos, acordar con su responsable un adaptador y pruebas; no se ha visto esa rama.
+- `context_from_current_snapshot` acepta exactamente el diccionario actual de `exposure_for_issuer` y los modelos existentes. La conexión con I1 requiere adaptar sus snapshots y acordar cómo representar una valoración parcial cuyo total es indeterminado.
 - El ejemplo contiene un snapshot de cartera y perfil. Tratar los resultados reales como información privada; no enviar datos reales a proveedores externos sin autorización ni controles adecuados.
 - El esquema SQLite no requiere migración: el sobre se incorpora de forma aditiva en `result.intelligence` del JSON del informe. El worker invoca inteligencia sobre el snapshot fijado al encolar; un fallo del proveedor marca el trabajo `failed`. Los informes anteriores permanecen sin ese campo. No hay un flujo multiagente ni deduplicación implementados. Los adaptadores de Grok/Groq se probaron con HTTP simulado; no se verificaron claves o servicios reales.

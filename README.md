@@ -1,8 +1,8 @@
-# Análisis de inversiones — incremento 0.1
+# Finance Intelligence Automation
 
 **Demo local con tenencias y noticias ficticias.** Funciona offline por defecto con precios e inteligencia simulados. El refresco de mercado opcional consulta EODHD y el BCE bajo demanda. El worker puede usar un modelo local con Ollama.
 
-Consulta el [acta de cierre de I1](docs/CIERRE_I1_CARTERA_Y_PRECIOS.md) para el alcance de la entrega y las comprobaciones realizadas.
+El [punto de entrada para agentes](AGENTS.md) recoge el estado de los módulos y las lecturas por tarea. La entrega de cartera y precios se recoge en el [acta de I1](docs/historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md).
 
 ## Arranque rápido con Docker (API + worker)
 
@@ -34,19 +34,19 @@ pytest -q
 
 ## Qué funciona
 
-- Una cartera y un perfil ficticios, editables por API; cada edición crea una nueva versión.
+- Cartera histórica I0 y perfil editables por API. Cada edición crea una versión.
 - Composiciones de ETF con fuente y fecha y con parte conocida/incompleta.
 - Endpoint `POST /api/analyses` que **encola** un trabajo. Ningún análisis se ejecuta sin acción explícita.
 - Worker independiente que procesa solo trabajos encolados, con estado consultable.
 - Cálculo de exposición directa/indirecta exacto con `Decimal`, sin mezclar divisas sin FX.
 - Informe persistido e inmutable ligado a versión de cartera, perfil y snapshot documental.
-- Dashboard de solo lectura con un botón de análisis y advertencias de simulación.
+- Dashboard con dos acciones independientes. **Actualizar precios** valora la cartera multiactivo I1. **Analizar cartera** genera un informe sobre la cartera histórica I0.
 
 ## Limitaciones deliberadas de este incremento
 
 No hay todavía importador CSV, chat, autorización de usuarios, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración. La API de I0 permite crear versiones de la cartera y del perfil. Los informes son para revisión humana.
 
-El worker incorpora el resultado de inteligencia al informe, en `result.intelligence`, sin alterar las exposiciones deterministas. Por defecto utiliza el mock; el modelo local Ollama es opcional y solo acepta datos de demostración. Véanse [uso de inteligencia](docs/USO_INTELIGENCIA.md) y [contrato propuesto](docs/CONTRATO_DATOS_UNIFICADO.md).
+El worker incorpora el resultado de inteligencia al informe, en `result.intelligence`, sin alterar las exposiciones deterministas. Por defecto utiliza el mock; el modelo local Ollama es opcional y solo acepta datos de demostración. Véanse [uso de inteligencia](docs/inteligencia/USO_INTELIGENCIA.md) y [contrato v1.1](docs/inteligencia/CONTRATO_DATOS_UNIFICADO.md).
 
 **No exponer esta demo directamente a Internet:** los endpoints de escritura no tienen autenticación.
 
@@ -55,7 +55,7 @@ El worker incorpora el resultado de inteligencia al informe, en `result.intellig
 | Método | Ruta | Efecto |
 |---|---|---|
 | `GET` | `/api/health` | Estado y modo de ejecución |
-| `GET`, `PUT` | `/api/portfolio` | Leer / crear versión de cartera |
+| `GET`, `PUT` | `/api/portfolio` | Leer o crear una versión de la cartera histórica I0 |
 | `GET` | `/api/portfolio/valuation` | Leer las tenencias multiactivo activas y su última valoración guardada |
 | `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración a demanda. El modo automático usa la configuración del servidor. La API también admite `mode=simulated` y `mode=live` explícitos |
 | `GET`, `PUT` | `/api/profile` | Leer / crear versión de perfil |
@@ -64,19 +64,7 @@ El worker incorpora el resultado de inteligencia al informe, en `result.intellig
 | `GET` | `/api/reports` | Listado de informes |
 | `GET` | `/api/reports/{id}` | Informe y snapshot inmutable completo |
 
-## Organización
-
-```text
-backend/app/{models,fixtures,analysis,db,main,worker}.py
-backend/app/portfolio/{models,fixtures,valuation,valuation_store}.py
-frontend/index.html
-tests/test_analysis.py, tests/test_api.py, tests/test_portfolio_models.py
-docs/PLAN_ARQUITECTURA.md, docs/DECISIONES_PENDIENTES.md
-```
-
-Consultar `docs/PLAN_ARQUITECTURA.md` para evolución de etapa 1 y decisiones de producción.
-
-## I1.1 · Cartera multiactivo offline
+## Posiciones y datos simulados
 
 El módulo `app.portfolio` representa instrumentos, listings, cuentas y posiciones. Las observaciones de NAV, cierre, último precio, precio indicativo y FX tienen procedencia propia. El contrato interno usa fechas ISO para NAV y `Decimal` para cantidades, precios, tasas y coberturas. En JSON, las cantidades fraccionarias se transmiten como cadenas. La tasa FX expresa unidades de la moneda cotizada por cada unidad de moneda base.
 
@@ -104,7 +92,7 @@ python -m pytest -q tests/test_portfolio_valuation.py
 
 Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio`, la última `valuation` del mismo identificador, versión y snapshot, y su `valuation_mode` (`simulated` o `live`). Si todavía no hay una valoración guardada, la pantalla muestra los precios pendientes. Cada refresco correcto devuelve HTTP 201 y crea un snapshot propio. La demo simulada muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
 
-La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa el snapshot de I0 fijado al encolar y añade el resultado de inteligencia al informe. La conexión con la cartera multiactivo queda pendiente de coordinación mediante [`PortfolioAnalysisView v1`](docs/CONTRATO_CARTERA_ANALISIS_V1.md).
+La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa el snapshot de I0 fijado al encolar y añade el resultado de inteligencia al informe. La conexión con la cartera multiactivo queda pendiente de coordinación mediante [`PortfolioAnalysisView v1`](docs/cartera/CONTRATO_CARTERA_ANALISIS_V1.md).
 
 ### Datos de mercado
 
