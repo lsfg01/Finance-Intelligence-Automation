@@ -1,5 +1,7 @@
 # Contrato y ámbito de desarrollo — Pipeline de inteligencia (propuesta v0.1)
 
+> Propuesta histórica anterior a las PR de inteligencia. Para trabajar en el módulo, consulta el [contrato implementado](../../inteligencia/CONTRATO_DATOS_UNIFICADO.md).
+
 **Estado: PROPUESTA PARA REVISIÓN. No es un contrato ya implementado.**  
 **Fecha:** 2026-11-22  
 **Responsables:** desarrollo de inteligencia (módulo aislado) + equipo (integración compartida).

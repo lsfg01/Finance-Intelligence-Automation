@@ -1,6 +1,6 @@
 # I1 · Cierre de cartera y datos de mercado
 
-**Cerrado funcionalmente el 23 de noviembre de 2026** en el entorno local de la rama `feat/cartera-dominio`.
+**Cerrado funcionalmente el 23 de noviembre de 2026** en el entorno local de la rama `feat/cartera-dominio`. Integrado en `main` el 24 de noviembre de 2026 mediante la [PR 3](https://github.com/lsfg01/Finance-Intelligence-Automation/pull/3).
 
 La demo muestra 11 posiciones con cantidades ficticias y permite valorarlas con precios de mercado. Al abrir la cartera, el dashboard recupera de SQLite las posiciones y la última valoración de esa versión. Al pulsar **Actualizar precios**, el backend consulta los proveedores, calcula los importes en euros y guarda una nueva valoración. El refresco conserva las cantidades y los informes históricos.
 
@@ -43,9 +43,9 @@ La activación de mercado se describe en el README. La credencial se configura e
 
 ## Referencias
 
-- [Activación y uso del dashboard](../README.md)
-- [Decisión de proveedor](adr/0001-market-data-provider.md)
-- [Adaptador de tipos de cambio del BCE](ADAPTADOR_FX_BCE.md)
-- [Contrato de cartera para análisis y ejemplo JSON](CONTRATO_CARTERA_ANALISIS_V1.md)
-- [Plan original de I1](historico/I1/PLAN_I1_DATOS_MERCADO_Y_CARTERA.md)
-- [Matriz del estudio y contrastes con las gestoras](historico/I1/RESULTADOS_SPIKE_I1.md)
+- [Activación y uso del dashboard](../../../README.md)
+- [Decisión de proveedor](../../adr/0001-market-data-provider.md)
+- [Adaptador de tipos de cambio del BCE](../../cartera/ADAPTADOR_FX_BCE.md)
+- [Contrato de cartera para análisis y ejemplo JSON](../../cartera/CONTRATO_CARTERA_ANALISIS_V1.md)
+- [Plan original de I1](PLAN_I1_DATOS_MERCADO_Y_CARTERA.md)
+- [Matriz del estudio y contrastes con las gestoras](RESULTADOS_SPIKE_I1.md)
