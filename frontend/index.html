@@ -15,31 +15,82 @@
     button:disabled{background:#879bad;cursor:default}.stat{font-size:1.6rem;font-weight:720;margin:7px 0} .pair{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     code{background:#eef2f6;padding:2px 4px;border-radius:3px;word-break:break-all} ul{padding-left:20px} li{margin:7px 0}
     .table-scroll{overflow-x:auto}
+    input,select{font:inherit;max-width:100%;padding:7px;border:1px solid #aab9c8;border-radius:5px}
+    .holdings-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:12px 0}
+    .holdings-controls label{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0;max-width:100%}
+    input[type=file]{width:min(100%,350px)}
+    .secondary{background:white;color:#215caa;border:1px solid #afc5dc}
+    .secondary:disabled{color:#607485;background:#e9eef2}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:16px 0}
+    .metrics div{background:#f6f8fa;padding:12px;border-radius:8px}
+    .metrics dt{color:#506577;font-size:.86rem}
+    .metrics dd{font-size:1.16rem;font-weight:650;margin:6px 0 0}
+    dialog{width:min(850px,calc(100% - 24px));max-height:calc(100dvh - 24px);border:1px solid #dbe3ea;border-radius:12px;padding:20px;color:inherit}
+    dialog::backdrop{background:#172d4488}
+    .dialog-actions{position:sticky;bottom:-20px;background:#fff;border-top:1px solid #dbe3ea;margin:12px -20px -20px;padding:12px 20px}
+    .table-scroll table{min-width:660px}
+    summary{cursor:pointer;color:#215caa}
+    :focus-visible{outline:2px solid #215caa;outline-offset:3px}
+    [hidden]{display:none!important}
     @media(max-width:750px){.cards{grid-template-columns:1fr}header{padding:22px}}
   </style>
 </head>
 <body>
-<header><h1>Laboratorio de análisis de inversiones</h1><div class="sub">Primer incremento · Cartera versionada · Exposición trazable · Análisis bajo demanda</div></header>
+<header><h1>Laboratorio de análisis de inversiones</h1></header>
 <main>
   <div class="alert"><strong>SIMULACIÓN.</strong> Las posiciones y noticias son ficticias. La tabla identifica el origen y la fecha de cada precio.</div>
   <section class="card" aria-labelledby="valuation-title">
-    <div class="pair">
-      <h2 id="valuation-title">Cartera</h2>
-      <button id="refresh-prices">Actualizar precios</button>
+    <h2 id="valuation-title">Cartera</h2>
+    <div class="holdings-controls">
+      <label>Cartera activa <select id="portfolio-select" disabled></select></label>
     </div>
     <p id="versions" class="muted"></p>
     <p id="valuation-status" class="muted" role="status">Cargando cartera…</p>
+    <div class="holdings-controls">
+      <button id="run" hidden>Analizar cartera</button>
+      <button id="refresh-prices" class="secondary" hidden>Actualizar precios</button>
+      <button id="open-import">Importar cartera</button>
+      <button id="show-imported" class="secondary" hidden>Ver valoración del CSV</button>
+    </div>
+    <p id="status" role="status" class="muted" hidden></p>
+    <p id="report-link" hidden><a href="#report-panel">Ver informe guardado</a></p>
     <p id="refresh-status" class="muted" role="status" hidden></p>
-    <div id="valuation" class="table-scroll"></div>
+    <div id="valuation-metrics"></div>
+    <div id="valuation" class="table-scroll" tabindex="0" role="region" aria-label="Posiciones"></div>
   </section>
-  <div class="cards">
-    <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div></section>
-    <section class="card"><h2>Ejecutar análisis</h2><p class="small muted">Análisis de la cartera histórica I0, bajo demanda.</p><button id="run">Analizar cartera</button><p id="status" role="status"></p></section>
-  </div>
-  <section class="card"><div class="pair"><h2>Informe</h2><span id="report-version" class="pill" hidden></span></div><div id="report"><p class="muted">Aún no hay informe seleccionado. Ejecuta un análisis.</p></div></section>
+  <dialog id="import-dialog" aria-labelledby="import-title">
+    <h2 id="import-title">Importar cartera</h2>
+    <fieldset class="holdings-controls">
+      <legend>Origen</legend>
+      <label><span><input name="import-source" type="radio" checked autofocus> Desde archivo</span></label>
+      <label><span><input name="import-source" type="radio" id="account-source"> Conectar cuenta</span></label>
+    </fieldset>
+    <form id="import-holdings">
+      <div class="holdings-controls">
+        <label>Cuenta de Investing.com <input id="investing-account" required maxlength="100" placeholder="Nombre de la cartera ficticia"></label>
+        <label>CSV de Investing.com Holdings <input id="investing-file" type="file" accept=".csv,text/csv" required></label>
+        <button id="preview-investing" class="secondary" type="submit">Vista previa</button>
+      </div>
+    </form>
+    <div id="connect-account" hidden>
+      <button class="secondary" disabled>Alpaca Paper · pendiente</button>
+    </div>
+    <p id="investing-status" role="status" class="muted"></p>
+    <div id="preview-metrics"></div>
+    <div id="investing-preview" class="table-scroll" tabindex="0" role="region" aria-label="Vista previa de Investing.com"></div>
+    <div class="holdings-controls dialog-actions">
+      <button id="cancel-import" class="secondary" type="button">Cancelar</button>
+      <button id="confirm-investing" type="button" hidden>Importar</button>
+    </div>
+  </dialog>
+  <section class="card"><h2>Perfil del inversor</h2><div id="profile"></div></section>
+  <section id="report-panel" class="card"><div class="pair"><h2>Informe</h2><span id="report-version" class="pill" hidden></span></div>
+    <label id="report-picker" hidden>Informe guardado <select id="report-select"></select></label>
+    <div id="report"><p class="muted">Aún no hay informe seleccionado.</p></div>
+  </section>
 </main>
 <script>
-const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = x => Number(x).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:'always'});
 async function api(url, options){
  const response = await fetch(url, options);
  if(response.ok) return response.json();
@@ -47,81 +98,10 @@ async function api(url, options){
  throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${response.status}`);
 }
 async function refresh(){
- const [profile,reports] = await Promise.all([api('/api/profile'),api('/api/reports')]);
+ const profile = await api('/api/profile');
  document.getElementById('profile').innerHTML=`<p><strong>${esc(profile.data.name)}</strong> · versión ${profile.version}</p><p>Horizonte: ${esc(profile.data.horizon)}</p><p>Riesgo: ${esc(profile.data.risk_tolerance)}</p><p class="muted small">${profile.data.constraints.map(esc).join(' · ')}</p>`;
- if(reports.length){await showReport(reports[0].id)}
 }
 function esc(x){return String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-const priceButton = document.getElementById('refresh-prices');
-const refreshStatus = document.getElementById('refresh-status');
-const valuationStatus = document.getElementById('valuation-status');
-const valuationElement = document.getElementById('valuation');
-const valuationStates = {COMPLETE:'Completa',PARTIAL:'Parcial',MISSING:'Sin posiciones valoradas'};
-const priceTypes = {NAV:'Valor liquidativo',EOD_CLOSE:'Cierre diario',LAST:'Última cotización',INDICATIVE:'Precio indicativo'};
-const valuationIssues = {
- UNKNOWN_INSTRUMENT:'Instrumento desconocido',UNSUPPORTED_ASSET:'Activo sin método de valoración',
- AMBIGUOUS_LISTING:'Plaza ambigua',MISSING_LISTING:'Falta la plaza',INVALID_LISTING:'Plaza inválida',
- MISSING_PRICE:'Sin precio disponible',STALE_PRICE:'Precio desactualizado',
- PRICE_CURRENCY_MISMATCH:'La moneda del precio no coincide',AMBIGUOUS_PRICE:'Precio ambiguo',
- MISSING_FX:'Sin tipo de cambio para la fecha del precio',AMBIGUOUS_FX:'Tipo de cambio ambiguo'
-};
-const valuationAmount = (value, currency) => value === null ? '—' : `${fmt(value)} ${esc(currency)}`;
-function renderValuation({portfolio, valuation, valuation_mode, instruments, listings}){
- document.getElementById('versions').textContent = `Demo multiactivo · Versión ${portfolio.version} · Moneda ${portfolio.base_currency}`;
- valuationStatus.textContent = valuation
-  ? `Precios ${valuation_mode === 'live' ? 'de mercado' : 'simulados'} · Fecha de valoración ${valuation.as_of} · ${valuationStates[valuation.status]} · ${valuation.valued_positions} de ${valuation.total_positions} posiciones valoradas`
-  : 'Precios pendientes. Aún no hay una valoración guardada.';
- const instrumentById = new Map(instruments.map(item=>[item.instrument_id,item]));
- const listingById = new Map(listings.map(item=>[item.listing_id,item]));
- const priceById = new Map((valuation?.price_observations ?? []).map(item=>[item.observation_id,item]));
- const fxById = new Map((valuation?.fx_observations ?? []).map(item=>[item.observation_id,item]));
- const valueByPosition = new Map((valuation?.positions ?? []).map(row=>[row.position.position_id,row]));
- const rows = portfolio.positions.map(position=>{
-  const row = valueByPosition.get(position.position_id);
-  const instrument = instrumentById.get(position.instrument_id);
-  const listing = listingById.get(position.listing_id);
-  const price = priceById.get(row?.price_observation_id);
-  const fx = fxById.get(row?.fx_observation_id);
-  return `<tr><td><strong>${esc(instrument?.name ?? position.instrument_id)}</strong>
-   <div class="muted small">${esc(listing ? listing.ticker+' · '+listing.mic : instrument?.isin ?? position.instrument_id)}</div></td>
-   <td>${esc(position.quantity)}</td>
-   <td>${price ? `${esc(price.value.replace('.', ','))} ${esc(price.currency)}` : '—'}</td>
-   <td>${valuationAmount(row?.quote_value ?? null,row?.quote_currency)}</td>
-   <td>${valuationAmount(row?.base_value ?? null,portfolio.base_currency)}</td>
-   <td>${price ? `${esc(priceTypes[price.price_type] ?? price.price_type)} · ${esc(price.price_as_of)}
-    <div class="muted small">${price.is_simulated ? 'Simulado' : 'Mercado'} · ${esc(price.provider)}<br>${esc(price.source)}</div>` : '—'}
-    ${fx ? `<div class="muted small">FX · ${esc(fx.provider)} · ${esc(fx.as_of)}<br>${esc(fx.source)}</div>` : ''}</td>
-   <td>${esc(row ? (row.issue ? valuationIssues[row.issue] ?? row.issue : 'Valorada') : 'Pendiente')}</td></tr>`;
- }).join('');
- const summary = valuation ? `<div class="pair">
-  <p><strong>Valor conocido</strong> ${valuationAmount(valuation.known_value,valuation.base_currency)}</p>
-  <p><strong>Total de cartera</strong> ${valuation.total_value === null ? 'Indeterminado' : valuationAmount(valuation.total_value,valuation.base_currency)}</p></div>` : '';
- valuationElement.innerHTML = `${summary}
-  <table aria-label="Posiciones de la cartera multiactivo"><thead><tr>
-  <th>Instrumento</th><th>Cantidad</th><th>Precio</th><th>Valor de posición</th>
-  <th>Valor en moneda base</th><th>Fecha y fuente</th><th>Estado</th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
-}
-async function loadValuation(refreshPrices){
- priceButton.disabled = true;
- if(refreshPrices){
-  refreshStatus.hidden = false;
-  refreshStatus.textContent = 'Actualizando precios…';
- }
- try{
-  const url = refreshPrices ? '/api/portfolio/refresh-prices' : '/api/portfolio/valuation';
-  renderValuation(await api(url, refreshPrices ? {method:'POST'} : undefined));
-  refreshStatus.hidden = true;
- }catch(error){
-  const target = refreshPrices ? refreshStatus : valuationStatus;
-  target.textContent = (refreshPrices ? 'No se pudieron actualizar los precios. ' : 'No se pudo cargar la cartera. ')+error.message;
- }finally{
-  priceButton.disabled = false;
- }
-}
-priceButton.addEventListener('click',()=>loadValuation(true));
-loadValuation(false);
-
 function intelligenceSection(envelope){
  if(!envelope) return '<h3>Inteligencia</h3><p class="muted">Este informe anterior no incluye inteligencia.</p>';
  const x=envelope.result;
@@ -135,6 +115,10 @@ function intelligenceSection(envelope){
 }
 async function showReport(id){
  const r=await api('/api/reports/'+encodeURIComponent(id));const d=r.result;
+ if(d.kind === 'portfolio-test'){
+  renderPortfolioReport(r);
+  return;
+ }
  const b=document.getElementById('report-version');b.hidden=false;b.textContent=`Cartera v${r.portfolio_version} · Perfil v${r.profile_version} · ${d.data_classification}`;
  document.getElementById('report').innerHTML=`<h3>Resultado determinista</h3><p><span class="pill">${esc(d.proposal)}</span> <strong>${esc(d.rationale)}</strong></p>
  <h3>Exposición identificada</h3>${d.exposures.map(e=>`<p><strong>${esc(e.issuer_id)}</strong>: ${fmt(e.known_total_eur)} EUR (${esc(e.known_share_pct ?? '?')} % de la cartera)<br><span class="small muted">Directa: ${fmt(e.direct_eur)} · Indirecta: ${fmt(e.indirect_eur)}</span></p>
@@ -145,21 +129,7 @@ async function showReport(id){
  <h3>Limitaciones y argumentos</h3><ul>${[...d.arguments_against,...d.risks,...d.missing_data,...d.warnings].map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
  ${intelligenceSection(d.intelligence)}<p class="small muted">Informe congelado; los cambios posteriores de cartera/perfil no lo modificarán.</p>`;
 }
-const btn=document.getElementById('run');const status=document.getElementById('status');
-btn.addEventListener('click',async()=>{
- btn.disabled=true; status.textContent='Creando trabajo...';
- try{
-  const r=await api('/api/analyses',{method:'POST'});status.textContent=`Trabajo ${r.id.slice(0,8)}: en cola`;
-  for(let tries=0;tries<120;tries++){
-    await new Promise(resolve=>setTimeout(resolve,1000));const s=await api('/api/analyses/'+r.id);
-    status.textContent='Estado: '+s.status;
-    if(s.status==='completed'){await showReport(s.report_id);break;}
-    if(s.status==='failed'){throw new Error(s.error || 'Error desconocido');}
-    if(tries===119){status.textContent='El trabajo sigue pendiente. Comprueba que el worker esté arrancado.'}
-  }
- } catch(e){status.textContent='Error: '+e.message} finally{btn.disabled=false}
-});
-refresh().catch(e=>status.textContent='Error al cargar: '+e.message);
 </script>
+<script src="/assets/holdings.js"></script>
 </body>
 </html>

@@ -24,8 +24,8 @@ def test_dashboard_refresh_persists_a_partial_valuation_without_creating_an_anal
     with TestClient(create_app(str(path))) as client:
         page = client.get("/")
         assert page.status_code == 200
-        assert 'id="refresh-prices">Actualizar precios' in page.text
-        assert 'id="run">Analizar cartera' in page.text
+        assert 'id="refresh-prices"' in page.text and 'Actualizar precios</button>' in page.text
+        assert 'id="run"' in page.text and 'Analizar cartera</button>' in page.text
         initial = client.get("/api/portfolio/valuation").json()
         assert initial["portfolio"] == DEMO_PORTFOLIO.model_dump(mode="json")
         assert len(initial["portfolio"]["positions"]) == 11

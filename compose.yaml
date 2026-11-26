@@ -7,6 +7,9 @@ services:
       DB_PATH: /data/portfolio.sqlite3
       ENABLE_LIVE_MARKET_DATA: ${ENABLE_LIVE_MARKET_DATA:-0}
       EODHD_API_TOKEN: ${EODHD_API_TOKEN:-}
+      ALPACA_OAUTH_CLIENT_ID: ${ALPACA_OAUTH_CLIENT_ID:-}
+      ALPACA_OAUTH_CLIENT_SECRET: ${ALPACA_OAUTH_CLIENT_SECRET:-}
+      ALPACA_OAUTH_REDIRECT_URI: ${ALPACA_OAUTH_REDIRECT_URI:-}
     volumes:
       - demo_data:/data
   worker:

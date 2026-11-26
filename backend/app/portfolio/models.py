@@ -51,6 +51,7 @@ class PriceType(StrEnum):
     EOD_CLOSE = "EOD_CLOSE"
     LAST = "LAST"
     INDICATIVE = "INDICATIVE"
+    IMPORTED = "IMPORTED"
 
 
 class Instrument(DomainModel):

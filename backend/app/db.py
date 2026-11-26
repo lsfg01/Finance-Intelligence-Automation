@@ -11,6 +11,14 @@ from .fixtures import DEMO_PORTFOLIO, DEMO_PROFILE, DEMO_DOCUMENT
 from .models import Portfolio, Profile, SourceDocument
 from .orchestration import build_analysis
 from .intelligence.providers import ProviderError
+from .intelligence.portfolio_test import AnalysisSelection, PortfolioTestInput, analyze_portfolio_snapshot
+from .portfolio.analysis_view import PortfolioAnalysisView
+from .portfolio.fixtures import DEMO_INSTRUMENTS, DEMO_LISTINGS
+from .portfolio.valuation_store import ValuationSnapshotStore
+
+
+class AnalysisSnapshotNotFound(ValueError):
+    pass
 
 
 def utcnow() -> str:
@@ -71,6 +79,10 @@ def init_db(path: str) -> None:
                 documents_snapshot_json TEXT NOT NULL,
                 payload_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS portfolio_analysis_runs (
+                run_id TEXT PRIMARY KEY REFERENCES analysis_runs(id),
+                payload_json TEXT NOT NULL
+            );
         """)
         if conn.execute("SELECT COUNT(*) FROM portfolio_versions").fetchone()[0] == 0:
             conn.execute("INSERT INTO portfolio_versions(created_at,payload_json) VALUES(?,?)",
@@ -101,27 +113,63 @@ def save_version(path: str, table: str, payload: Portfolio | Profile) -> dict:
         return {"version": cur.lastrowid, "data": payload.model_dump(mode="json")}
 
 
-def create_run(path: str) -> dict:
+def create_run(path: str, selection: AnalysisSelection | None = None) -> dict:
+    if selection is not None:
+        store = ValuationSnapshotStore(Path(path))
+        portfolio = store.portfolio_version(selection.portfolio_id, selection.portfolio_version)
+        valuation = store.get(selection.valuation_id)
+        if portfolio is None or valuation is None or valuation.portfolio_snapshot_id != portfolio.snapshot_id:
+            raise AnalysisSnapshotNotFound("La valoración no pertenece a la versión seleccionada")
+        instrument_ids = {position.instrument_id for position in portfolio.positions}
+        view = PortfolioAnalysisView(
+            contract_version="1", portfolio=portfolio, valuation=valuation,
+            instruments=tuple(item for item in DEMO_INSTRUMENTS if item.instrument_id in instrument_ids),
+            listings=tuple(item for item in DEMO_LISTINGS if item.instrument_id in instrument_ids),
+        )
+        source = store.get_source(portfolio.snapshot_id)
+        imported = store.get_import(portfolio.snapshot_id)
     with connect(path) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        pv = conn.execute("SELECT version FROM portfolio_versions ORDER BY version DESC LIMIT 1").fetchone()[0]
-        pf = conn.execute("SELECT version FROM profile_versions ORDER BY version DESC LIMIT 1").fetchone()[0]
+        pv = (selection.portfolio_version if selection
+              else conn.execute("SELECT version FROM portfolio_versions ORDER BY version DESC LIMIT 1").fetchone()[0])
+        profile = conn.execute("SELECT version,payload_json FROM profile_versions ORDER BY version DESC LIMIT 1").fetchone()
+        pf = profile["version"]
         docs = [json.loads(r["payload_json"]) for r in conn.execute("SELECT payload_json FROM documents ORDER BY id")]
         run_id = str(uuid.uuid4())
         now = utcnow()
         conn.execute("""INSERT INTO analysis_runs(id,status,created_at,updated_at,portfolio_version,
                      profile_version,documents_json) VALUES(?,?,?,?,?,?,?)""",
                      (run_id, "queued", now, now, pv, pf, to_json(docs)))
-        return {"id": run_id, "status": "queued", "portfolio_version": pv, "profile_version": pf}
+        result = {"id": run_id, "status": "queued", "portfolio_version": pv, "profile_version": pf}
+        if selection:
+            context = PortfolioTestInput(
+                contract_version="1", run_id=run_id, queued_at=datetime.fromisoformat(now), profile_version=pf,
+                profile=Profile.model_validate_json(profile["payload_json"]),
+                documents=tuple(SourceDocument.model_validate(doc) for doc in docs),
+                view=view, source=source, imported=imported,
+            )
+            conn.execute("INSERT INTO portfolio_analysis_runs VALUES (?,?)", (run_id, context.model_dump_json()))
+            result.update(selection.model_dump())
+        return result
 
 
 def get_run(path: str, run_id: str) -> dict | None:
     with connect(path) as conn:
         row = conn.execute("SELECT * FROM analysis_runs WHERE id=?", (run_id,)).fetchone()
+        selection = conn.execute(
+            """
+            SELECT json_extract(payload_json, '$.view.portfolio.portfolio_id') AS portfolio_id,
+                   json_extract(payload_json, '$.view.valuation.snapshot_id') AS valuation_id
+            FROM portfolio_analysis_runs WHERE run_id=?
+            """, (run_id,),
+        ).fetchone()
     if not row:
         return None
-    return {k: row[k] for k in ("id", "status", "created_at", "updated_at", "portfolio_version",
-                                 "profile_version", "error", "report_id")}
+    result = {k: row[k] for k in ("id", "status", "created_at", "updated_at", "portfolio_version",
+                                  "profile_version", "error", "report_id")}
+    if selection:
+        result.update(dict(selection))
+    return result
 
 
 def list_reports(path: str) -> list[dict]:
@@ -136,13 +184,17 @@ def get_report(path: str, report_id: str) -> dict | None:
         row = conn.execute("SELECT * FROM reports WHERE id=?", (report_id,)).fetchone()
     if row is None:
         return None
+    result = json.loads(row["payload_json"])
+    portfolio = json.loads(row["portfolio_snapshot_json"])
+    test_snapshot = {"portfolio_analysis": portfolio} if result.get("kind") == "portfolio-test" else {}
     return {"id": row["id"], "created_at": row["created_at"],
             "portfolio_version": row["portfolio_version"], "profile_version": row["profile_version"],
             "input_snapshot": {
-                "portfolio": json.loads(row["portfolio_snapshot_json"]),
+                "portfolio": portfolio["view"]["portfolio"] if test_snapshot else portfolio,
                 "profile": json.loads(row["profile_snapshot_json"]),
-                "documents": json.loads(row["documents_snapshot_json"])
-            }, "result": json.loads(row["payload_json"])}
+                "documents": json.loads(row["documents_snapshot_json"]),
+                **test_snapshot,
+            }, "result": result}
 
 
 def process_one(path: str, pipeline=None) -> str | None:
@@ -157,19 +209,25 @@ def process_one(path: str, pipeline=None) -> str | None:
                      (utcnow(), run_id))
     try:
         with connect(path) as conn:
-            p_row = conn.execute("SELECT payload_json FROM portfolio_versions WHERE version=?",
-                                 (row["portfolio_version"],)).fetchone()
+            frozen = conn.execute("SELECT payload_json FROM portfolio_analysis_runs WHERE run_id=?", (run_id,)).fetchone()
+            if not frozen:
+                p_row = conn.execute("SELECT payload_json FROM portfolio_versions WHERE version=?",
+                                     (row["portfolio_version"],)).fetchone()
             f_row = conn.execute("SELECT payload_json FROM profile_versions WHERE version=?",
                                  (row["profile_version"],)).fetchone()
-        portfolio_json = p_row["payload_json"]
+        portfolio_json = (frozen or p_row)["payload_json"]
         profile_json = f_row["payload_json"]
         docs_json = row["documents_json"]
-        report = build_analysis(
-            run_id=run_id, portfolio_version=row["portfolio_version"], profile_version=row["profile_version"],
-            created_at=row["created_at"], portfolio=Portfolio.model_validate_json(portfolio_json),
-            profile=Profile.model_validate_json(profile_json),
-            documents=[SourceDocument.model_validate(d) for d in json.loads(docs_json)], pipeline=pipeline,
-        )
+        if frozen:
+            context = PortfolioTestInput.model_validate_json(portfolio_json)
+            report = analyze_portfolio_snapshot(context).model_dump(mode="json")
+        else:
+            report = build_analysis(
+                run_id=run_id, portfolio_version=row["portfolio_version"], profile_version=row["profile_version"],
+                created_at=row["created_at"], portfolio=Portfolio.model_validate_json(portfolio_json),
+                profile=Profile.model_validate_json(profile_json),
+                documents=[SourceDocument.model_validate(d) for d in json.loads(docs_json)], pipeline=pipeline,
+            )
         report_id = str(uuid.uuid4())
         with connect(path) as conn:
             conn.execute("""INSERT INTO reports(id,created_at,portfolio_version,profile_version,
