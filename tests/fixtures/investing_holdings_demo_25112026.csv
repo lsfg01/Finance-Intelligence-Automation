@@ -1,0 +1,16 @@
+"Resumen de posiciones"
+"","Nombre","Símbolo","Mercado","Tipo","Cantidad","Precio medio","Precio actual","Val. mercado","Comisión","Peso relativo","B/P diario","% B/P diario","% B/P neto","B/P neto","Último","Fecha/Hora"
+"","SPDR S&P 500","SPY","NYSE","Compra","20.00000000","703,13","703,84","14.076,80 $","0,00 $","78,54%","12,93 €","0,10%","0,10%","12,93 €","703,84","18:05:00"
+"","Microsoft","MSFT.O","NASDAQ","Compra","5.00000000","482,43","483,22","2.416,10 $","0,00 $","13,48%","3,60 €","0,16%","0,16%","3,60 €","483,12","18:04:52"
+"","NVIDIA","NVDA.O","NASDAQ","Compra","10.00000000","142,60","142,95","1.429,50 $","0,00 $","7,98%","3,19 €","0,25%","0,25%","3,19 €","142,83","18:04:40"
+
+"Val. mercado","16.320,14 €"
+"B/P posic. abiertas","19,71 / 0,12% €"
+"B/P diario","19,71 / 0,12% €"
+"B/P total","19,71 €"
+
+"Posiciones abiertas"
+"","Nombre","Símbolo","Mercado","Fecha apertura","Tipo","Cantidad","Precio entrada"
+"","SPDR S&P 500","SPY","NYSE","25/11/2026","Compra","20.00000000","703,13"
+"","Microsoft","MSFT.O","NASDAQ","25/11/2026","Compra","5.00000000","482,43"
+"","NVIDIA","NVDA.O","NASDAQ","25/11/2026","Compra","10.00000000","142,60"

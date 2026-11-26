@@ -27,6 +27,8 @@ EODHD_SYMBOLS = {
     ("E03", "E03-XETR"): "EUNA.XETRA",
     ("A01", "A01-XMAD"): "IBE.MC",
     ("A02", "A02-XNAS"): "MSFT.US",
+    ("A03", "A03-XNAS"): "NVDA.US",
+    ("E04", "E04-ARCX"): "SPY.US",
     ("C01", "C01-XETR"): "PPFB.XETRA",
     ("K01", None): BITCOIN_EUR_SYMBOL,
 }
@@ -35,6 +37,10 @@ LIVE_MAX_PRICE_AGE_DAYS = 7
 
 class MarketCredentialsRejected(Exception):
     """EODHD no acepta la credencial configurada."""
+
+
+class MarketPricesUnavailable(Exception):
+    """El refresco no produjo una cotización utilizable."""
 
 
 def refresh_demo_prices(store: ValuationSnapshotStore, portfolio: PortfolioSnapshot) -> ValuationSnapshot:
@@ -46,6 +52,8 @@ def refresh_demo_prices(store: ValuationSnapshotStore, portfolio: PortfolioSnaps
         if (observation := provider.get_latest(position.instrument_id, position.listing_id)) is not None
     )
     rate = provider.get_rate(portfolio.base_currency, "USD", DEMO_AS_OF)
+    # Reuse the dated fixtures for later holdings while retaining their original market dates.
+    as_of = max(DEMO_AS_OF, portfolio.as_of)
     snapshot = value_portfolio(
         portfolio,
         quotes,
@@ -53,15 +61,16 @@ def refresh_demo_prices(store: ValuationSnapshotStore, portfolio: PortfolioSnaps
         instruments=DEMO_INSTRUMENTS,
         listings=DEMO_LISTINGS,
         snapshot_id=str(uuid4()),
-        as_of=max(DEMO_AS_OF, portfolio.as_of),
+        as_of=as_of,
         calculated_at=datetime.now(timezone.utc),
+        max_price_age_days=(as_of - DEMO_AS_OF).days,
     )
     store.save(snapshot, mode="simulated")
     return snapshot
 
 
 def refresh_market_prices(
-    store: ValuationSnapshotStore, portfolio: PortfolioSnapshot, token: str
+    store: ValuationSnapshotStore, portfolio: PortfolioSnapshot, token: str, *, require_prices: bool = False,
 ) -> ValuationSnapshot:
     as_of = datetime.now(timezone.utc).date()
     start = as_of - timedelta(days=LIVE_MAX_PRICE_AGE_DAYS)
@@ -129,5 +138,7 @@ def refresh_market_prices(
         calculated_at=datetime.now(timezone.utc),
         max_price_age_days=LIVE_MAX_PRICE_AGE_DAYS,
     )
+    if require_prices and not snapshot.price_observations:
+        raise MarketPricesUnavailable
     store.save(snapshot, mode="live")
     return snapshot

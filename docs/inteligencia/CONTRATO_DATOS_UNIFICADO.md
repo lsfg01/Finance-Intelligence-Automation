@@ -1,6 +1,6 @@
 # Contrato de inteligencia v1.1
 
-El worker consume `AnalysisContext` de la cartera histórica I0 y guarda `AnalysisEnvelope` v1.1 en los nuevos informes. La cartera multiactivo I1 ya expone su [vista de análisis](../cartera/CONTRATO_CARTERA_ANALISIS_V1.md). Su conexión con el worker está pendiente.
+El worker consume `AnalysisContext` de la cartera histórica I0 y guarda `AnalysisEnvelope` v1.1 para ese recorrido. La cartera multiactivo I1 usa una [vista de análisis](../cartera/CONTRATO_CARTERA_ANALISIS_V1.md) en el mismo worker y un [consumidor determinista de prueba](../ejemplos/analisis_cartera_importada_demo.json). La adopción de la vista multiactivo por el contrato definitivo queda pendiente.
 
 ## Archivos para intercambiar
 

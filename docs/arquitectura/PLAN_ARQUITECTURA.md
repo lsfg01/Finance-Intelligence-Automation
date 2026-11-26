@@ -97,7 +97,7 @@ El incremento 0.1 usa rutas `/api/*` simplificadas; migrar a `/v1/*` con OpenAPI
 
 ## Backlog incremental sugerido
 
-La tabla recoge la secuencia prevista inicialmente. La entrega de cartera y datos de mercado se documenta en el [cierre de I1](../historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md). La importación de posiciones desde CSV queda para un incremento posterior.
+La tabla recoge la secuencia prevista inicialmente. La entrega de cartera y datos de mercado se documenta en el [cierre de I1](../historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md). La importación CSV y el análisis de prueba sobre el snapshot importado se cerraron en la [demo de Investing.com](../historico/cartera/CIERRE_DEMO_INVESTING.md).
 
 | Iteración | Resultado observable | Criterio de salida |
 |---|---|---|

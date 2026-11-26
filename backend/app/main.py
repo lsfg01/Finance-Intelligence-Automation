@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from . import db
+from .intelligence.portfolio_test import AnalysisSelection
 from .models import Portfolio, Profile
 from .portfolio.routes import valuation_router
 
@@ -30,6 +31,10 @@ def create_app(database_path: str | None = None) -> FastAPI:
     def home():
         return FileResponse(frontend_path())
 
+    @app.get("/assets/holdings.js", include_in_schema=False)
+    def holdings_script():
+        return FileResponse(frontend_path().with_name("holdings.js"), media_type="text/javascript")
+
     @app.get("/api/health")
     def health():
         return {"status": "ok", "mode": "demo", "model_calls": None}
@@ -51,8 +56,11 @@ def create_app(database_path: str | None = None) -> FastAPI:
         return db.save_version(path, "profile_versions", payload)
 
     @app.post("/api/analyses", status_code=status.HTTP_202_ACCEPTED)
-    def create_analysis():
-        return db.create_run(path)
+    def create_analysis(selection: AnalysisSelection | None = None):
+        try:
+            return db.create_run(path, selection)
+        except db.AnalysisSnapshotNotFound as error:
+            raise HTTPException(404, str(error)) from None
 
     @app.get("/api/analyses/{run_id}")
     def get_analysis(run_id: str):

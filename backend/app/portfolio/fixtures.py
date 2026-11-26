@@ -41,6 +41,9 @@ DEMO_INSTRUMENTS = (
                asset_type=AssetType.EQUITY, isin="ES0144580Y14"),
     Instrument(instrument_id="A02", name="Microsoft", issuer_id="MICROSOFT",
                asset_type=AssetType.EQUITY, isin="US5949181045"),
+    Instrument(instrument_id="A03", name="NVIDIA", issuer_id="NVIDIA", asset_type=AssetType.EQUITY),
+    Instrument(instrument_id="E04", name="SPDR S&P 500 ETF Trust", asset_type=AssetType.ETF,
+               isin="US78462F1030", share_class_currency="USD", fund_base_currency="USD"),
     Instrument(instrument_id="C01", name="iShares Physical Gold ETC",
                asset_type=AssetType.ETC_ETN, isin="IE00B4ND3602"),
     Instrument(instrument_id="K01", name="Bitcoin", asset_type=AssetType.CRYPTO),
@@ -55,6 +58,8 @@ DEMO_LISTINGS = (
     Listing(listing_id="E03-XETR", instrument_id="E03", mic="XETR", ticker="EUNA", currency="EUR"),
     Listing(listing_id="A01-XMAD", instrument_id="A01", mic="XMAD", ticker="IBE", currency="EUR"),
     Listing(listing_id="A02-XNAS", instrument_id="A02", mic="XNAS", ticker="MSFT", currency="USD"),
+    Listing(listing_id="A03-XNAS", instrument_id="A03", mic="XNAS", ticker="NVDA", currency="USD"),
+    Listing(listing_id="E04-ARCX", instrument_id="E04", mic="ARCX", ticker="SPY", currency="USD"),
     Listing(listing_id="C01-XETR", instrument_id="C01", mic="XETR", ticker="PPFB", currency="EUR"),
 )
 
@@ -125,6 +130,8 @@ DEMO_MARKET_OBSERVATIONS = tuple(
         ("E03", "E03-XETR", "EUR", "5.43", PriceType.EOD_CLOSE, DEMO_AS_OF),
         ("A01", "A01-XMAD", "EUR", "9.85", PriceType.EOD_CLOSE, DEMO_AS_OF),
         ("A02", "A02-XNAS", "USD", "291.50", PriceType.EOD_CLOSE, DEMO_AS_OF),
+        ("A03", "A03-XNAS", "USD", "55.00", PriceType.EOD_CLOSE, DEMO_AS_OF),
+        ("E04", "E04-ARCX", "USD", "460.00", PriceType.EOD_CLOSE, DEMO_AS_OF),
         ("C01", "C01-XETR", "EUR", "40.75", PriceType.EOD_CLOSE, DEMO_AS_OF),
         ("K01", None, "EUR", "31001.25", PriceType.INDICATIVE,
          datetime(2024, 1, 15, 21, 57, tzinfo=timezone.utc)),

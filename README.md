@@ -2,7 +2,7 @@
 
 **Demo local con tenencias y noticias ficticias.** Funciona offline por defecto con precios e inteligencia simulados. El refresco de mercado opcional consulta EODHD y el BCE bajo demanda. El worker puede usar un modelo local con Ollama.
 
-El [punto de entrada para agentes](AGENTS.md) recoge el estado de los módulos y las lecturas por tarea. La entrega de cartera y precios se recoge en el [acta de I1](docs/historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md).
+El [punto de entrada para agentes](AGENTS.md) recoge el estado de los módulos y las lecturas por tarea. El histórico conserva el [cierre de I1](docs/historico/I1/CIERRE_I1_CARTERA_Y_PRECIOS.md) y la [aceptación de la demo de Investing.com](docs/historico/cartera/CIERRE_DEMO_INVESTING.md).
 
 ## Arranque rápido con Docker (API + worker)
 
@@ -40,11 +40,11 @@ pytest -q
 - Worker independiente que procesa solo trabajos encolados, con estado consultable.
 - Cálculo de exposición directa/indirecta exacto con `Decimal`, sin mezclar divisas sin FX.
 - Informe persistido e inmutable ligado a versión de cartera, perfil y snapshot documental.
-- Dashboard con dos acciones independientes. **Actualizar precios** valora la cartera multiactivo I1. **Analizar cartera** genera un informe sobre la cartera histórica I0.
+- Dashboard con importación y selección de carteras de Investing.com Holdings. **Analizar cartera** fija la versión y valoración visibles y genera un informe de prueba en el worker. **Actualizar precios** solicita una nueva valoración de mercado a demanda.
 
 ## Limitaciones deliberadas de este incremento
 
-No hay todavía importador CSV, chat, autorización de usuarios, exportación de informes, búsqueda histórica/RAG, alertas, métricas de costes o despliegue público. La cola SQLite es solo para un worker local en demostración. La API de I0 permite crear versiones de la cartera y del perfil. Los informes son para revisión humana.
+Quedan fuera de esta entrega el chat, la autorización de usuarios, la exportación de informes, la búsqueda histórica/RAG, las alertas, las métricas de costes y el despliegue público. La cola SQLite es solo para un worker local en demostración. La API de I0 permite crear versiones de la cartera y del perfil. Los informes son para revisión humana.
 
 El worker incorpora el resultado de inteligencia al informe, en `result.intelligence`, sin alterar las exposiciones deterministas. Por defecto utiliza el mock; el modelo local Ollama es opcional y solo acepta datos de demostración. Véanse [uso de inteligencia](docs/inteligencia/USO_INTELIGENCIA.md) y [contrato v1.1](docs/inteligencia/CONTRATO_DATOS_UNIFICADO.md).
 
@@ -56,10 +56,14 @@ El worker incorpora el resultado de inteligencia al informe, en `result.intellig
 |---|---|---|
 | `GET` | `/api/health` | Estado y modo de ejecución |
 | `GET`, `PUT` | `/api/portfolio` | Leer o crear una versión de la cartera histórica I0 |
-| `GET` | `/api/portfolio/valuation` | Leer las tenencias multiactivo activas y su última valoración guardada |
-| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración a demanda. El modo automático usa la configuración del servidor. La API también admite `mode=simulated` y `mode=live` explícitos |
+| `GET` | `/api/portfolio/holdings` | Listar las carteras multiactivo disponibles |
+| `POST` | `/api/portfolio/investing/preview`, `/api/portfolio/investing/confirm` | Revisar un CSV de Holdings y confirmar el archivo revisado |
+| `GET` | `/api/portfolio/alpaca/authorize`, `/api/portfolio/alpaca/callback` | Autorizar la conexión OAuth de solo lectura en Paper |
+| `POST` | `/api/portfolio/alpaca/sync` | Crear una versión de las posiciones abiertas de la cuenta Paper conectada |
+| `GET` | `/api/portfolio/valuation` | Leer las tenencias seleccionadas mediante `portfolio_id` y su última valoración. Sin parámetro se usa la demo I1 |
+| `POST` | `/api/portfolio/refresh-prices` | Guardar una valoración de la cartera indicada por `portfolio_id`. La API también admite `mode=simulated` y `mode=live` explícitos |
 | `GET`, `PUT` | `/api/profile` | Leer / crear versión de perfil |
-| `POST` | `/api/analyses` | Encolar nuevo análisis manual |
+| `POST` | `/api/analyses` | Encolar análisis de prueba con `portfolio_id`, `portfolio_version` y `valuation_id`. Una petición sin cuerpo conserva el recorrido histórico I0 |
 | `GET` | `/api/analyses/{id}` | Estado, error, informe generado |
 | `GET` | `/api/reports` | Listado de informes |
 | `GET` | `/api/reports/{id}` | Informe y snapshot inmutable completo |
@@ -88,19 +92,33 @@ python -m pytest -q tests/test_portfolio_models.py
 python -m pytest -q tests/test_portfolio_valuation.py
 ```
 
+## Cargar carteras ficticias desde el dashboard
+
+1. Descarga el CSV UTF-8 de *Holdings* con símbolo, plaza y cantidad. En **Importar cartera → Desde archivo**, elige un nombre para la cuenta ficticia, adjunta el archivo y pulsa **Vista previa**. [Exportación de cartera](https://www.investing-support.com/hc/en-us/articles/360000249657-How-to-Download-Your-Portfolio-from-Investing-com).
+2. Revisa las posiciones y pulsa **Importar**. El resumen aporta una posición agregada por instrumento y plaza. El desglose de posiciones abiertas aporta los lotes cuando está disponible. La app guarda y activa la cartera y su valoración en una operación, con cero consultas de mercado y cero análisis encolados.
+3. Pulsa **Analizar cartera** con el worker en marcha. El informe de prueba conserva la cartera, su versión, la valoración, el perfil y los documentos fijados al encolar. El selector de informes también permite abrir los históricos de I0.
+
+El mismo nombre identifica la cuenta. Repetir un archivo idéntico conserva la versión y la valoración. Una exportación distinta sustituye el conjunto activo y conserva el anterior en SQLite. **Conectar cuenta** muestra Alpaca Paper como pendiente mientras se completa la validación OAuth externa.
+
+La valoración distingue los importes y pesos declarados por Investing.com de los que calcula I1. El total declarado en EUR se muestra aunque falte FX por posición y el total calculado siga indeterminado. La fecha de referencia procede de una columna explícita o del nombre del archivo, con el origen indicado. La fecha de apertura, la hora de cotización y el instante UTC de carga se conservan por separado. Para probar el consumidor determinista se incluye un [ejemplo de entrada y salida](docs/ejemplos/analisis_cartera_importada_demo.json).
+
+### Aceptación del recorrido
+
+La [suite de aceptación](tests/test_investing_acceptance.py) se ejecuta con `python -m pytest -q`. El [acta de cierre](docs/historico/cartera/CIERRE_DEMO_INVESTING.md#evidencia-de-aceptación) recoge los resultados y los identificadores de cartera, valoración, trabajo e informe de la ejecución en Chrome.
+
 ## I1.4 · Refresco de precios en el dashboard
 
-Al abrir el dashboard, **Cartera** muestra las once posiciones y sus cantidades ficticias. La API devuelve el snapshot de tenencias como `portfolio`, la última `valuation` del mismo identificador, versión y snapshot, y su `valuation_mode` (`simulated` o `live`). Si todavía no hay una valoración guardada, la pantalla muestra los precios pendientes. Cada refresco correcto devuelve HTTP 201 y crea un snapshot propio. La demo simulada muestra diez de once posiciones valoradas, el valor conocido y el total indeterminado.
+Al abrir el dashboard por primera vez, **Cartera** comienza vacía si aún no hay una importación. La cartera ficticia original está disponible en el selector. La API devuelve `portfolio`, `valuation`, `valuation_mode` (`imported`, `simulated` o `live`) y los datos del CSV en `imported` cuando proceden. Cada refresco correcto guarda una valoración con identidad propia. **Ver valoración del CSV** permite volver a consultar o analizar la valoración original después de un refresco.
 
-La cartera multiactivo se inicializa una vez por versión en el mismo SQLite, incluso si el volumen contiene la demo I0. **Analizar cartera** usa el snapshot de I0 fijado al encolar y añade el resultado de inteligencia al informe. La conexión con la cartera multiactivo queda pendiente de coordinación mediante [`PortfolioAnalysisView v1`](docs/cartera/CONTRATO_CARTERA_ANALISIS_V1.md).
+El análisis multiactivo usa [`PortfolioAnalysisView v1`](docs/cartera/CONTRATO_CARTERA_ANALISIS_V1.md) en un contexto de prueba versionado. El consumidor es determinista y se ejecuta en el mismo worker. El contrato de inteligencia v1.1 sigue disponible para I0.
 
 ### Datos de mercado
 
-En un entorno autorizado para consultar, conservar y mostrar los datos, configura `ENABLE_LIVE_MARKET_DATA=1` y `EODHD_API_TOKEN` en el entorno del proceso API. Con Docker Compose puedes copiarlas desde `.env.example` a un archivo local `.env` ignorado por Git y recrear el servicio API con `docker compose up -d --build api`. Para Uvicorn local, exporta las variables antes de arrancar. Pulsa **Actualizar precios** para ejecutar el modo configurado en el servidor. Con mercado habilitado, una credencial ausente devuelve HTTP 503 y una credencial rechazada por EODHD devuelve HTTP 502. El modo simulado sigue disponible cuando el servidor funciona offline o mediante `?mode=simulated`.
+En un entorno autorizado para consultar, conservar y mostrar los datos, configura `ENABLE_LIVE_MARKET_DATA=1` y `EODHD_API_TOKEN` en el entorno del proceso API. Con Docker Compose puedes copiarlas desde `.env.example` a un archivo local `.env` ignorado por Git y recrear el servicio API con `docker compose up -d --build api`. Para Uvicorn local, exporta las variables antes de arrancar. **Actualizar precios** solicita el modo de mercado (`live`). Mercado deshabilitado o sin credencial devuelve HTTP 503. Una credencial rechazada por EODHD devuelve HTTP 502. El modo simulado sigue disponible por API mediante `?mode=simulated`.
 
 La valoración de mercado toma la fecha UTC del inicio del refresco. Se usa el último NAV de la clase o cierre diario sin ajustar del listing exacto dentro de los últimos siete días naturales. La fecha efectiva de cada precio se muestra junto a su fuente y puede ser anterior a la fecha de valoración. Para convertir USD a EUR se usa la tasa del BCE de la misma fecha que el precio. El importe conocido suma las posiciones valoradas. Las filas sin datos válidos conservan su motivo y el total queda indeterminado. La pantalla recupera de SQLite la fecha y el modo guardados de la valoración.
 
-Cada refresco de mercado consulta una vez por símbolo resuelto y solicita FX por combinación necesaria de moneda y fecha. Los fallos de proveedor dejan la fila sin observación, con `MISSING_PRICE` o `MISSING_FX` según corresponda. El modo de mercado conserva sus snapshots en el volumen local. Consulta el [ADR de proveedor](docs/adr/0001-market-data-provider.md) antes de compartir el acceso o el volumen.
+Cada refresco de mercado consulta una vez por símbolo resuelto y solicita FX por combinación necesaria de moneda y fecha. La cobertura parcial deja las filas afectadas con `MISSING_PRICE` o `MISSING_FX`. Si el refresco de una cartera importada se queda sin precios utilizables, la API devuelve HTTP 502 y conserva la valoración previa. Consulta el [ADR de proveedor](docs/adr/0001-market-data-provider.md) antes de compartir el acceso o el volumen.
 
 Para Bitcoin, EODHD publica el par `BTC-EUR.CC`. Se usa como precio indicativo en EUR el cierre de su última barra diaria completa, con corte al día anterior en UTC. [Catálogo de criptomonedas de EODHD](https://eodhd.com/financial-apis/list-supported-crypto-currencies).
 

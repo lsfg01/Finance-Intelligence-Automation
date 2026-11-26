@@ -1,6 +1,13 @@
 # Decisiones por acordar con el equipo
 
-Al cierre de I1 siguen pendientes las condiciones de uso de EODHD por el equipo y la adopción de la cartera multiactivo por inteligencia. La decisión de proveedor cuenta con una [ADR](../adr/0001-market-data-provider.md). Las tareas propuestas están en la [guía de entrada](../../AGENTS.md).
+Tras [cerrar la demo de Investing.com](../historico/cartera/CIERRE_DEMO_INVESTING.md), quedan pendientes la validación autenticada de Alpaca Paper, las condiciones de uso de EODHD por el equipo y la adopción de la cartera multiactivo por el consumidor definitivo de inteligencia. La decisión de proveedor cuenta con una [ADR](../adr/0001-market-data-provider.md). El [contexto para la próxima sesión](../../AGENTS.md#siguiente-incremento-módulo-de-fuentes) describe el punto de partida del módulo de fuentes.
+
+## Cartera real
+
+Después de validar las dos vías de la demo, el equipo deberá elegir los orígenes para el primer uso con posiciones reales.
+
+- **Fichero.** Elegir la entidad, el tipo de extracto de posiciones y su formato (CSV o PDF). El extracto de valores de Trade Republic es candidato. Validar en una muestra anonimizada cómo se identifican los instrumentos, las cantidades y la fecha de referencia.
+- **API.** Elegir el bróker y la cuenta autorizada para la primera sincronización real. Comprobar que la API oficial permite leer las posiciones con autorización de solo lectura y que sus condiciones permiten el uso previsto.
 
 ## Preguntas de planificación inicial
 

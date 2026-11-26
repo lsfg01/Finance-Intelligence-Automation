@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 from enum import StrEnum
@@ -158,6 +158,7 @@ def value_portfolio(
     calculated_at: datetime,
     max_price_age_days: int = 0,
     listed_price_type: PriceType = PriceType.EOD_CLOSE,
+    declared_values: Mapping[str, tuple[Decimal, str]] | None = None,
 ) -> ValuationSnapshot:
     """Valora una cartera congelada con las observaciones disponibles en el corte."""
     if calculated_at.utcoffset() != timezone.utc.utcoffset(None):
@@ -166,8 +167,10 @@ def value_portfolio(
         raise ValueError("as_of must fall between the holdings date and the calculation date")
     if max_price_age_days < 0:
         raise ValueError("max_price_age_days must be nonnegative")
-    if listed_price_type not in {PriceType.EOD_CLOSE, PriceType.LAST}:
-        raise ValueError("listed prices must use EOD_CLOSE or LAST")
+    if listed_price_type not in {PriceType.EOD_CLOSE, PriceType.LAST, PriceType.IMPORTED}:
+        raise ValueError("listed prices must use EOD_CLOSE, LAST or IMPORTED")
+    if declared_values and listed_price_type != PriceType.IMPORTED:
+        raise ValueError("declared values require an imported valuation")
 
     instruments_by_id = _unique_by_id(instruments, lambda item: item.instrument_id)
     listings_by_id = _unique_by_id(listings, lambda item: item.listing_id)
@@ -217,7 +220,15 @@ def value_portfolio(
             expected_currency = instrument.share_class_currency
 
         candidates = prices_by_key[instrument.instrument_id, position.listing_id, price_type]
+        declared = (declared_values or {}).get(position.position_id)
         if not candidates:
+            if declared and declared[1] in (expected_currency, holdings.base_currency):
+                amount, currency = declared
+                return PositionValuation(
+                    position=position, quote_currency=currency, quote_value=amount,
+                    base_value=amount if currency == holdings.base_currency else None,
+                    issue=None if currency == holdings.base_currency else PositionIssue.MISSING_FX,
+                )
             return PositionValuation(position=position, issue=PositionIssue.MISSING_PRICE)
         compatible = [price for price in candidates if expected_currency in (None, price.currency)]
         if not compatible:
@@ -229,13 +240,15 @@ def value_portfolio(
         if price is None:
             return PositionValuation(position=position, issue=PositionIssue.AMBIGUOUS_PRICE)
 
-        quote_value = position.quantity * price.value
+        quote_value = declared[0] if declared and declared[1] == price.currency else position.quantity * price.value
         quote_details = {
             "quote_currency": price.currency,
             "quote_value": quote_value,
             "price_observation_id": price.observation_id,
         }
         base = holdings.base_currency
+        if declared and declared[1] == base:
+            return PositionValuation(position=position, base_value=declared[0], **quote_details)
         if price.currency == base:
             return PositionValuation(position=position, base_value=quote_value, **quote_details)
 

@@ -23,4 +23,4 @@ view = PortfolioAnalysisView.model_validate_json(
 )
 ```
 
-El worker todavía prepara el [contexto de inteligencia](../inteligencia/CONTRATO_DATOS_UNIFICADO.md) con I0. Al conectar I1, el adaptador debe conservar el total indeterminado cuando la cobertura sea parcial y comprobar que cada referencia de precio o FX exista en las observaciones del snapshot. Hoy el lector de la vista puede aceptar una referencia ausente.
+El worker admite el [contexto de inteligencia](../inteligencia/CONTRATO_DATOS_UNIFICADO.md) de I0 y un contexto de prueba para I1. Este último incluye la vista anterior, el perfil, los documentos y los datos declarados del CSV asociados a su valoración original. Valida las referencias de precio y FX y conserva la cobertura del cálculo en moneda base. El [ejemplo de entrada y salida de la demo](../ejemplos/analisis_cartera_importada_demo.json) se puede reproducir con el consumidor determinista.

@@ -19,8 +19,9 @@ from app.portfolio.models import AssetType, FXObservation, FundComposition, Mark
 def test_fixture_positions_reference_exact_instruments_and_listings():
     instruments = {item.instrument_id: item for item in DEMO_INSTRUMENTS}
     listings = {item.listing_id: item for item in DEMO_LISTINGS}
-    assert set(instruments) == {"F01", "F02", "F03", "E01", "E02", "E03", "A01", "A02", "C01", "K01", "F04"}
-    assert {position.instrument_id for position in DEMO_PORTFOLIO.positions} == set(instruments)
+    demo_ids = {"F01", "F02", "F03", "E01", "E02", "E03", "A01", "A02", "C01", "K01", "F04"}
+    assert {position.instrument_id for position in DEMO_PORTFOLIO.positions} == demo_ids
+    assert demo_ids <= instruments.keys()
     assert DEMO_PORTFOLIO.is_simulated
     for position in DEMO_PORTFOLIO.positions:
         assert isinstance(position.quantity, Decimal)
